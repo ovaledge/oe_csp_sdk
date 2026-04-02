@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.ovaledge</groupId>
+        <artifactId>oe-csp-sdk</artifactId>
+        <version>8.1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>oe-csp-sdk-assembly</artifactId>
+    <packaging>jar</packaging>
+    <name>oe-csp-sdk-assembly</name>
+    <description>Assembly module that creates a single comprehensive JAR with all SDK connectors</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.ovaledge</groupId>
+            <artifactId>csp-sdk-core</artifactId>
+        </dependency>
+
+        <!-- Connectors -->
+        <dependency>
+            <groupId>com.ovaledge</groupId>
+            <artifactId>monetdb</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.ovaledge</groupId>
+            <artifactId>awsconsole</artifactId>
+        </dependency>
+        <!-- Add new Connector dependencies here -->
+
+        <!-- Test dependencies for git test -->
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <artifactId>hamcrest-core</artifactId>
+                    <groupId>org.hamcrest</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-all</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-model</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <finalName>csp-sdk-${project.version}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <skipTests>false</skipTests>
+                            <includes>
+                                <include>**/validation/CspSdkGitTest.java</include>
+                            </includes>
+                            <excludes>
+                                <exclude>**/unit/**/*Test.java</exclude>
+                                <exclude>**/integration/**/*Test.java</exclude>
+                                <exclude>**/e2e/**/*Test.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <!-- 
+                                  ServicesResourceTransformer: Merges META-INF/services files
+                                  Purpose: Ensures all connector service files are properly merged for discovery
+                                  Critical: Required for connector auto-discovery mechanism
+                                -->
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>module-info.class</exclude>
+                                        <!-- Exclude the entire quick package from all modules -->
+                                        <exclude>**/quick/**</exclude>
+                                    </excludes>
+                                </filter>
+                                <!-- Exclude conflicting logging implementations -->
+                                <filter>
+                                    <artifact>ch.qos.logback:logback-classic</artifact>
+                                    <excludes>
+                                        <exclude>**</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>ch.qos.logback:logback-core</artifact>
+                                    <excludes>
+                                        <exclude>**</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.slf4j:slf4j-reload4j</artifact>
+                                    <excludes>
+                                        <exclude>**</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.slf4j:slf4j-log4j12</artifact>
+                                    <excludes>
+                                        <exclude>**</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.slf4j:slf4j-nop</artifact>
+                                    <excludes>
+                                        <exclude>**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <artifactSet>
+                                <excludes>
+                                    <!-- Exclude Spring Boot - not needed for library JAR, only csp-api and individual QuickApplications need it -->
+                                    <exclude>org.springframework.boot:spring-boot</exclude>
+                                    <exclude>org.springframework.boot:spring-boot-autoconfigure</exclude>
+                                    <exclude>org.springframework.boot:spring-boot-starter</exclude>
+                                    <exclude>org.springframework.boot:spring-boot-starter-web</exclude>
+                                    <exclude>org.springframework.boot:spring-boot-starter-web-services</exclude>
+                                    <exclude>org.springframework.boot:spring-boot-starter-json</exclude>
+                                    <exclude>org.springframework.boot:spring-boot-starter-logging</exclude>
+                                    <exclude>org.springframework.boot:spring-boot-starter-tomcat</exclude>
+                                    <!-- Exclude embedded Tomcat - not needed for library JAR -->
+                                    <exclude>org.apache.tomcat.embed:tomcat-embed-core</exclude>
+                                    <exclude>org.apache.tomcat.embed:tomcat-embed-el</exclude>
+                                    <exclude>org.apache.tomcat.embed:tomcat-embed-websocket</exclude>
+                                    <!-- Exclude Spring Framework - provided by csp-sdk-core / csp-sdk-core / OasisProject runtime -->
+                                    <exclude>org.springframework:spring-webmvc</exclude>
+                                    <exclude>org.springframework:spring-web</exclude>
+                                    <exclude>org.springframework:spring-core</exclude>
+                                    <exclude>org.springframework:spring-context</exclude>
+                                    <exclude>org.springframework:spring-beans</exclude>
+                                    <exclude>org.springframework:spring-aop</exclude>
+                                    <exclude>org.springframework:spring-expression</exclude>
+                                    <exclude>org.springframework:spring-instrument</exclude>
+                                    <exclude>org.springframework:spring-jcl</exclude>
+                                    <exclude>org.springframework:spring-jdbc</exclude>
+                                    <exclude>org.springframework:spring-tx</exclude>
+                                    <exclude>org.springframework:spring-oxm</exclude>
+                                    <exclude>org.springframework.ws:spring-ws-core</exclude>
+                                    <exclude>org.springframework.ws:spring-xml</exclude>
+                                    <!-- Exclude Jakarta XML Web Services - only needed for standalone QuickApplications -->
+                                    <exclude>jakarta.xml.ws:jakarta.xml.ws-api</exclude>
+                                    <exclude>jakarta.xml.soap:jakarta.xml.soap-api</exclude>
+                                    <exclude>com.sun.xml.messaging.saaj:saaj-impl</exclude>
+                                    <!-- Exclude csp-sdk-core as it will be provided in the jar path along with csp-common-dependencies -->
+                                    <exclude>com.ovaledge:csp-sdk-core</exclude>
+
+                                    <!--
+                                      OvalEdge loads `csp-common-dependencies*.jar` first, so Parquet/Hadoop/Avro
+                                      classes are expected to come from there via csp-sdk-core (not from this SDK uber/shaded JAR).
+                                      These excludes ensure the SDK jar does not bundle Parquet/Hadoop/Avro in assembly (including
+                                      transitive parquet-* / hadoop-* artifacts), avoiding duplicate classes and
+                                      potential runtime version conflicts.
+                                    -->
+                                    <exclude>org.apache.parquet:parquet-avro</exclude>
+                                    <exclude>org.apache.parquet:parquet-common</exclude>
+                                    <exclude>org.apache.parquet:parquet-hadoop</exclude>
+                                    <exclude>org.apache.avro:avro</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-auth</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-common</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-client</exclude>
+                                    <exclude>org.apache.parquet:parquet-column</exclude>
+                                    <exclude>org.apache.parquet:parquet-encoding</exclude>
+                                    <exclude>org.apache.parquet:parquet-format-structures</exclude>
+                                    <exclude>org.apache.parquet:parquet-jackson</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-annotations</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-hdfs-client</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-yarn-api</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-yarn-client</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-yarn-common</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-mapreduce-client-core</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-mapreduce-client-jobclient</exclude>
+                                    <exclude>org.apache.hadoop:hadoop-mapreduce-client-common</exclude>
+                                    <exclude>org.apache.hadoop.thirdparty:hadoop-shaded-guava</exclude>
+                                    <exclude>org.apache.hadoop.thirdparty:hadoop-shaded-protobuf_3_25</exclude>
+                                </excludes>
+                            </artifactSet>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

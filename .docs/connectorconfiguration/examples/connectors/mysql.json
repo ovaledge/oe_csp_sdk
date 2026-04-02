@@ -1,0 +1,157 @@
+{
+  "connectorMaster": {
+    "server": "mysql",
+    "displayName": "MySQL",
+    "tooltip": "MySQL",
+    "oeDocs": "https://docs.ovaledge.com/connectors/connector-repositories/rdbms/mysql",
+    "shortDescription": "MySQL Database connector",
+    "active": true,
+    "connTypeId": 0,
+    "connType": 0,
+    "imgSource": "img/db/mysql",
+    "dialect": "mysql",
+    "protocol": "JDBC",
+    "dtoRegisterName": "com.ovaledge.csp.dto.db.MySqlDuplicateDto",
+    "accessDtoRegisterName": null,
+    "driver": "com.mysql.cj.jdbc.Driver",
+    "oeConnCategory": "RDBMS",
+    "srcConnCategory": "RDBMS",
+    "conncategory": null,
+    "artifactsPackage": "Standard",
+    "version": null,
+    "isBaseConnector": false,
+    "crawling": true,
+    "deltaCrawling": true,
+    "queryLogsCrawling": true,
+    "profiling": true,
+    "deltaProfiling": true,
+    "sampleProfiling": true,
+    "conditionalProfiling": true,
+    "querySheet": true,
+    "queryPolicies": true,
+    "querySheetAppPermissions": true,
+    "querySheetSourcePermissions": true,
+    "anomalyDetection": true,
+    "dataAccess": true,
+    "dataAccessRemoteMaster": false,
+    "dataAccessOvaledgeMaster": false,
+    "autoLineage": true,
+    "dataQuality": true,
+    "bridge": false,
+    "proxy": true,
+    "dnsField": null,
+    "dataAtRestSecurity": true,
+    "dataInTransitSecurity": true,
+    "connectionPooling": true,
+    "queryTimeout": true,
+    "sourceSystemMetrics": true,
+    "authenticationTypes": [
+      "UserId & Password Authentication",
+      "Azure Entra ID Authentication"
+    ],
+    "credentialManagers": [
+      "DATABASE"
+    ],
+    "usageCostModel": "Usage Based"
+  },
+  "crawlerSettings": {
+    "name": "MySQL",
+    "server": "mysql",
+    "connType": 0,
+    "tableviewncols": true,
+    "relationship": true,
+    "procnfunc": true,
+    "reports": false,
+    "reportcolumns": false,
+    "querypermissionmode": true,
+    "indexes": true,
+    "settings": true,
+    "buildlineage": false,
+    "usernotification": true,
+    "contexturl": true,
+    "rdam": false,
+    "rbac": false,
+    "ubac": false,
+    "rpe": true,
+    "upe": true,
+    "uhp": true,
+    "une": true,
+    "rne": true,
+    "unemail": true,
+    "remotepolicy": true,
+    "fullcrawl": true,
+    "incrementalcrawl": true,
+    "profiletablesandcols": true,
+    "profileviewsandcols": true
+  },
+  "crawlerOptions": [
+    {
+      "optionType": "CRAWLER_OPTIONS",
+      "optionKey": "TVC"
+    },
+    {
+      "optionType": "CRAWLER_OPTIONS",
+      "optionKey": "RS"
+    },
+    {
+      "optionType": "CRAWLER_OPTIONS",
+      "optionKey": "PF"
+    },
+    {
+      "optionType": "CRAWLER_OPTIONS",
+      "optionKey": "IN"
+    },
+    {
+      "optionType": "CRAWLER_OPTIONS",
+      "optionKey": "QP"
+    },
+    {
+      "optionType": "CRAWLER_OPTIONS",
+      "optionKey": "SC"
+    },
+    {
+      "optionType": "CRAWLER_PREFERENCE",
+      "optionKey": "C"
+    },
+    {
+      "optionType": "CRAWLER_PREFERENCE",
+      "optionKey": "P"
+    },
+    {
+      "optionType": "CRAWLER_PREFERENCE",
+      "optionKey": "S"
+    },
+    {
+      "optionType": "PROFILE_OPTIONS",
+      "optionKey": "TC"
+    },
+    {
+      "optionType": "PROFILE_OPTIONS",
+      "optionKey": "VC"
+    },
+    {
+      "optionType": "PROFILE_TYPES",
+      "optionKey": "A"
+    },
+    {
+      "optionType": "PROFILE_TYPES",
+      "optionKey": "S"
+    },
+    {
+      "optionType": "PROFILE_TYPES",
+      "optionKey": "D"
+    },
+    {
+      "optionType": "CRAWL_TYPES",
+      "optionKey": "FC"
+    },
+    {
+      "optionType": "CRAWL_TYPES",
+      "optionKey": "INC"
+    }
+  ],
+  "credentialManagerMappings": ["DATABASE"],
+  "icons": {
+    "icon": "icons/mysql.png"
+  }
+}

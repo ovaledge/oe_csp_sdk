@@ -1,0 +1,65 @@
+---
+description: Build a new Apps connector in oe_csp_sdk (AppsConnector, MetadataService, QueryService).
+globs:
+alwaysApply: false
+---
+
+# Workflow: Build New Connector in oe_csp_sdk
+
+Builds a new connector module in **oe_csp_sdk** that implements `AppsConnector` (SPI), with `MetadataService` and `QueryService`. Use the **monetdb** module as reference for JDBC/DBMS connectors.
+
+steps:
+
+  - id: get_connector_inputs
+    type: input
+    prompt: |
+      Enter details for the new **oe_csp_sdk** connector (you can put all on one line or separate lines):
+      
+      1. **Connector name** (display / PascalCase, e.g. "Tally", "Xero", "MonetDB")
+      2. **Server type** (unique key, lowercase-with-hyphens, e.g. "tally", "monetdb")
+      3. **Short data source description** (e.g. "JDBC database", "REST API with OAuth2")
+      
+      Example: "Tally" / "tally" / "Tally ERP REST API with API key"
+      Reference: monetdb module in this repo.
+    var: connector_inputs
+
+  - id: build_connector
+    type: prompt
+    llm: auto
+    file: @.cursor/prompts/02_BuildNewConnectorSdk.md
+    prompt: |
+      **User inputs for this run:**
+      ${{ connector_inputs }}
+      ---
+      **Instructions:** From the above, derive CONNECTOR_NAME, SERVER_TYPE, and data source description only if clearly stated. If any of these are missing or ambiguous, ask the user for the missing or unclear inputs; do not assume or guess. Once you have clear inputs, apply the BuildNewConnectorSdk prompt and generate the full connector module. Use the **monetdb** module as the reference for JDBC/DBMS connectors.
+    vars:
+      connector_inputs: ${{ connector_inputs }}
+    pause: true
+    summarize: true
+    description: |
+      Generates the new connector module using the SDK prompt (Connector, MetadataService, QueryService, Constants, quick package: Controller + QuickApplication, SPI, pom updates).
+
+  - id: validate_and_integrate
+    type: prompt
+    llm: auto
+    prompt: |
+      For the connector just generated:
+      
+      1. **Verify** the new module compiles: run from oe_csp_sdk root
+         - mvn clean install -pl {connector-id} -am
+      2. **Check** the **quick** package is present: quick/{Prefix}Controller.java (health, supported-objects, connection/validate) and quick/{Prefix}QuickApplication.java; connector pom has spring-boot-starter-web and spring-boot-maven-plugin with mainClass.
+      3. **Check** parent pom.xml has <module>{connector-id}</module> and dependencyManagement entry.
+      4. **Check** csp-api/pom.xml and assembly/pom.xml include the connector dependency.
+      5. **Confirm** META-INF/services/com.ovaledge.csp.v3.core.apps.service.AppsConnector contains the connector FQCN.
+      
+      List any missing or incorrect integration steps and fix them.
+    vars:
+      connector_code: ${{ steps.build_connector.output }}
+    pause: true
+    description: |
+      Validates build and pom/SPI integration.
+
+# Notes:
+# - This workflow is for oe_csp_sdk Apps connectors only (not csp-lib DbDto connectors).
+# - Reference: monetdb module (MonetDBConnector, MetadataService, QueryService, MonetDBConstants, quick: MonetDBController, MonetDBQuickApplication).
+# - Optional: Add research step or link to external API docs if you have a separate research template.

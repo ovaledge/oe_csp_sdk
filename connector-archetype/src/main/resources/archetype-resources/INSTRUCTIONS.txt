@@ -1,0 +1,26 @@
+Connector module generated: ${artifactId}
+
+Add module to parent pom.xml (so the new connector module is built with the repo):
+<module>${artifactId}</module>
+
+Add dependencyManagement entry in parent pom.xml (so versions are managed centrally):
+<dependency>
+  <groupId>com.ovaledge</groupId>
+  <artifactId>${artifactId}</artifactId>
+  <version>${project.version}</version>
+</dependency>
+
+Add dependency to csp-api/pom.xml (so csp-api can discover the connector via ServiceLoader):
+<dependency>
+  <groupId>com.ovaledge</groupId>
+  <artifactId>${artifactId}</artifactId>
+</dependency>
+
+Add dependency to assembly/pom.xml (so the connector is packaged into the assembly bundle):
+<dependency>
+  <groupId>com.ovaledge</groupId>
+  <artifactId>${artifactId}</artifactId>
+</dependency>
+
+Generated package: com.ovaledge.csp.apps.${artifactId}
+Connector class: com.ovaledge.csp.apps.${artifactId}.main.${classPrefix}Connector

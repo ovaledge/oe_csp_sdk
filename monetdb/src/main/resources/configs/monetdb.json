@@ -1,0 +1,104 @@
+{
+    "connectorMaster": {
+        "server": "monetdb",
+        "displayName": "MonetDB",
+        "tooltip": "MonetDB JDBC Connector",
+        "oeDocs": "https://docs.ovaledge.com/connectors/connector-repositories/database/monetdb",
+        "shortDescription": "MonetDB JDBC connector for connecting to MonetDB databases and extracting metadata and data",
+        "active": true,
+        "connType": 20,
+        "imgSource": "img/db/monetdb",
+        "dialect": "monetdb",
+        "protocol": "JDBC",
+        "dtoRegisterName": "com.ovaledge.csp.apps.monetdb.main.MonetDBConnector",
+        "accessDtoRegisterName": null,
+        "driver": "org.monetdb.jdbc.MonetDriver",
+        "oeConnCategory": "Application Connectors",
+        "srcConnCategory": "Database",
+        "conncategory": null,
+        "artifactsPackage": "Standard",
+        "version": null,
+        "isBaseConnector": false,
+        "crawling": true,
+        "deltaCrawling": false,
+        "queryLogsCrawling": false,
+        "profiling": false,
+        "deltaProfiling": false,
+        "sampleProfiling": false,
+        "conditionalProfiling": false,
+        "querySheet": true,
+        "queryPolicies": false,
+        "querySheetAppPermissions": false,
+        "querySheetSourcePermissions": false,
+        "anomalyDetection": false,
+        "dataAccess": true,
+        "dataAccessRemoteMaster": false,
+        "dataAccessOvaledgeMaster": false,
+        "autoLineage": false,
+        "dataQuality": false,
+        "bridge": false,
+        "proxy": false,
+        "dnsField": null,
+        "dataAtRestSecurity": true,
+        "dataInTransitSecurity": true,
+        "connectionPooling": true,
+        "queryTimeout": true,
+        "sourceSystemMetrics": false,
+        "authenticationTypes": [
+            "Username & Password"
+        ],
+        "credentialManagers": [
+            "DATABASE"
+        ],
+        "usageCostModel": "Subscription Based"
+    },
+    "crawlerSettings": {
+        "name": "MonetDB",
+        "server": "monetdb",
+        "connType": 1,
+        "tableviewncols": true,
+        "relationship": false,
+        "procnfunc": true,
+        "reports": false,
+        "reportcolumns": false,
+        "querypermissionmode": false,
+        "indexes": true,
+        "settings": true,
+        "buildlineage": false,
+        "usernotification": true,
+        "contexturl": true,
+        "rdam": false,
+        "rbac": false,
+        "ubac": false,
+        "rpe": false,
+        "upe": false,
+        "uhp": false,
+        "une": false,
+        "rne": false,
+        "unemail": false,
+        "remotepolicy": false,
+        "fullcrawl": true,
+        "incrementalcrawl": false,
+        "profiletablesandcols": false,
+        "profileviewsandcols": false
+    },
+    "crawlerOptions": [
+        {
+            "optionType": "CRAWLER_OPTIONS",
+            "optionKey": "TVC"
+        },
+        {
+            "optionType": "CRAWLER_OPTIONS",
+            "optionKey": "IN"
+        },
+        { "optionType": "CRAWLER_PREFERENCE", "optionKey": "S" },
+        { "optionType": "CRAWLER_PREFERENCE", "optionKey": "C" }
+    ],
+    "credentialManagerMappings": [
+        "DATABASE"
+    ],
+    "icons": {
+        "icon": "icons/monetdb.png"
+    }
+}
+

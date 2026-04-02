@@ -1,0 +1,99 @@
+{
+    "connectorMaster": {
+        "server": "awsconsole",
+        "displayName": "AWS Console",
+        "tooltip": "AWS Console",
+        "oeDocs": "https://docs.ovaledge.com/connectors/connector-repositories/cloud/aws-console",
+        "shortDescription": "AWS Console connector for EC2, S3 and other AWS services via AWS SDK",
+        "active": true,
+        "connType": 20,
+        "imgSource": "img/db/awsconsole",
+        "dialect": null,
+        "protocol": "API",
+        "dtoRegisterName": "com.ovaledge.csp.apps.awsconsole.main.AwsConsoleConnector",
+        "accessDtoRegisterName": null,
+        "driver": null,
+        "oeConnCategory": "Application Connectors",
+        "srcConnCategory": "Cloud",
+        "conncategory": null,
+        "artifactsPackage": "Standard",
+        "version": null,
+        "isBaseConnector": false,
+        "crawling": true,
+        "deltaCrawling": false,
+        "queryLogsCrawling": false,
+        "profiling": false,
+        "deltaProfiling": false,
+        "sampleProfiling": false,
+        "conditionalProfiling": false,
+        "querySheet": true,
+        "queryPolicies": false,
+        "querySheetAppPermissions": false,
+        "querySheetSourcePermissions": false,
+        "anomalyDetection": false,
+        "dataAccess": true,
+        "dataAccessRemoteMaster": false,
+        "dataAccessOvaledgeMaster": false,
+        "autoLineage": false,
+        "dataQuality": false,
+        "bridge": false,
+        "proxy": false,
+        "dnsField": null,
+        "dataAtRestSecurity": true,
+        "dataInTransitSecurity": true,
+        "connectionPooling": false,
+        "queryTimeout": false,
+        "sourceSystemMetrics": false,
+        "authenticationTypes": [
+            "Access Key & Secret Key"
+        ],
+        "credentialManagers": [
+            "DATABASE"
+        ],
+        "usageCostModel": "Usage Based"
+    },
+    "crawlerSettings": {
+        "name": "AWS Console",
+        "server": "awsconsole",
+        "connType": 0,
+        "tableviewncols": true,
+        "relationship": false,
+        "procnfunc": false,
+        "reports": false,
+        "reportcolumns": false,
+        "querypermissionmode": false,
+        "indexes": false,
+        "settings": true,
+        "buildlineage": false,
+        "usernotification": true,
+        "contexturl": true,
+        "rdam": false,
+        "rbac": false,
+        "ubac": false,
+        "rpe": false,
+        "upe": false,
+        "uhp": false,
+        "une": false,
+        "rne": false,
+        "unemail": false,
+        "remotepolicy": false,
+        "fullcrawl": true,
+        "incrementalcrawl": false,
+        "profiletablesandcols": false,
+        "profileviewsandcols": false
+    },
+    "crawlerOptions": [
+        {
+            "optionType": "CRAWLER_OPTIONS",
+            "optionKey": "TVC"
+        },
+        { "optionType": "CRAWLER_PREFERENCE", "optionKey": "S" },
+        { "optionType": "CRAWLER_PREFERENCE", "optionKey": "C" }
+    ],
+    "credentialManagerMappings": [
+        "DATABASE"
+    ],
+    "icons": {
+        "icon": "icons/awsconsole.png"
+    }
+}

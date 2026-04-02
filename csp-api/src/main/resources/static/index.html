@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connectors API (V3)</title>
+    <link rel="icon" type="image/png"
+        href="https://awsmp-logos.s3.amazonaws.com/9e637479-5580-4e0a-bdaa-64c9eab60b99/e14350e58bd02872f67002b9baaedf6a.png">
+    <link rel="stylesheet" href="/css/style.css?v=${maven.build.timestamp}">
+</head>
+
+<body>
+    <div id="pageLoader" class="loader-overlay hidden">
+        <div class="spinner"></div>
+        <p id="loaderMessage">Loading...</p>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <img src="https://awsmp-logos.s3.amazonaws.com/9e637479-5580-4e0a-bdaa-64c9eab60b99/e14350e58bd02872f67002b9baaedf6a.png"
+                    alt="OvalEdge Logo" class="header-logo">
+            </div>
+            <div class="header-content">
+                <h1>OvalEdge Connectors API (V3)</h1>
+            </div>
+            <div class="header-right">
+                <button id="createConnectorBtn" class="action-btn" type="button"
+                    onclick="openConnectorGeneratorModal()">
+                    Create New Connector
+                </button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Left Panel: Form and Actions -->
+            <div class="left-panel">
+                <!-- Connector Selection Section (collapsible when a connector is selected) -->
+                <div class="section" id="selectConnectorSection">
+                    <h2 class="section-header-toggle" id="selectConnectorHeader" onclick="toggleSelectConnectorSection()" title="Click to expand or collapse">
+                        <span class="section-title-text">1. Select Connector</span>
+                        <span id="selectConnectorSelectedName" class="select-connector-selected-name"></span>
+                        <span class="section-chevron" id="selectConnectorChevron">▼</span>
+                    </h2>
+                    <div class="select-connector-body">
+                        <input type="text" id="connectorSearch" class="connector-search" placeholder="Search connectors..." autocomplete="off" aria-label="Search connectors">
+                        <div id="connectorList" class="connector-list">
+                            <div class="loading"></div> Loading connectors...
+                        </div>
+                        <div id="connectorListFooter" class="connector-list-footer hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Connection Configuration Section -->
+                <div class="section hidden" id="configSection">
+                    <h2>2. Connection Configuration</h2>
+                    <p id="configPlaceholder" class="config-placeholder">
+                        Select a connector to load required configuration fields.
+                    </p>
+                    <div class="form-container">
+                        <div id="connectionForm"></div>
+                    </div>
+                </div>
+
+                <!-- Actions Section (compact) -->
+                <div class="section section-compact hidden" id="actionsSection">
+                    <h2>Available Actions</h2>
+                    <div class="actions-grid actions-grid-compact" id="actionsGrid"></div>
+                </div>
+
+                <!-- Metadata Operations Section (compact) -->
+                <div class="section section-compact hidden" id="metadataSection">
+                    <div class="metadata-header">
+                        <h2>Metadata Operations</h2>
+                        <p class="metadata-ops-hint">
+                            Choose an operation below—you'll be prompted for any required parameters.
+                        </p>
+                    </div>
+                    <div class="actions-grid actions-grid-compact">
+                        <button class="action-btn" onclick="showMetadataInputModal('getObjects')">
+                            Get Objects
+                        </button>
+                        <button class="action-btn" onclick="showMetadataInputModal('getFields')">
+                            Get Fields
+                        </button>
+                        <button class="action-btn" onclick="showMetadataInputModal('executeQuery')">
+                            Execute Query
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Modal for Metadata Inputs -->
+                <div id="metadataModal" class="modal hidden">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="modalTitle">Enter Parameters</h3>
+                            <button class="modal-close" onclick="closeMetadataModal()">&times;</button>
+                        </div>
+                        <div class="modal-body" id="modalBody">
+                            <!-- Dynamic form fields will be inserted here -->
+                        </div>
+                        <div class="modal-footer">
+                            <button class="action-btn secondary" onclick="closeMetadataModal()">Cancel</button>
+                            <button class="action-btn" id="modalSubmitBtn"
+                                onclick="submitMetadataModal()">Submit</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal for Connector Generator -->
+                <div id="connectorGeneratorModal" class="modal hidden">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Create a New Connector</h3>
+                            <button class="modal-close" onclick="closeConnectorGeneratorModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="connectorGeneratorError" class="form-error hidden"></div>
+                            <div class="form-group">
+                                <label for="connectorNameInput">Connector Name / Data Source<span class="required">*</span></label>
+                                <input type="text" id="connectorNameInput" placeholder="MonetDB">
+                            </div>
+                            <div class="form-group form-group-dropdown">
+                                <label>Connector Objects<span class="required">*</span></label>
+                                <div class="dropdown" id="connectorObjectsDropdown">
+                                    <button type="button" class="dropdown-toggle" onclick="toggleConnectorObjectsDropdown()">
+                                        <span class="dropdown-trigger-inner">
+                                            <span id="connectorObjectsPills" class="pill-list-inline"></span>
+                                            <span id="connectorObjectsLabel" class="dropdown-placeholder">Select connector objects</span>
+                                        </span>
+                                        <span class="dropdown-caret">▾</span>
+                                    </button>
+                                    <div id="connectorObjectsList" class="dropdown-menu hidden"></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="connectorIconInput">Connector Icon (PNG, 64×64 or 128×128, 10–200 KB)</label>
+                                <input type="file" id="connectorIconInput" accept=".png,image/png">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="action-btn secondary" onclick="closeConnectorGeneratorModal()">Cancel</button>
+                            <button class="action-btn" id="connectorGenerateBtn"
+                                onclick="submitConnectorGenerator()">Generate</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Response -->
+            <div class="right-panel">
+                <div class="result-section" id="resultSection">
+                    <div class="result-header">
+                        <h3>Response</h3>
+                        <div class="result-actions">
+                            <button id="copyCurlBtn" class="icon-btn-small" onclick="copyCurl()" title="Copy as cURL">
+                                <span>🔗</span> cURL
+                            </button>
+                            <button id="copyResponseBtn" class="icon-btn-small" onclick="copyResponse()" title="Copy Response JSON">
+                                <span>📋</span> Copy
+                            </button>
+                        </div>
+                    </div>
+                    <div id="resultContent" class="result-content">Select a connector and execute an action to see results here.</div>
+                </div>
+                <!-- Vertical Resizer -->
+                <div id="logsResizer" class="resizer" title="Drag to resize logs"></div>
+                <!-- Logs Section -->
+                <div class="logs-section" id="logsSection">
+                    <div class="logs-header" onclick="toggleLogs()">
+                        <h3>🔍 CSP-API Logs</h3>
+                        <div class="logs-controls">
+                            <div class="logs-status">
+                                <span class="status-indicator" id="logsStatusIndicator"></span>
+                                <span id="logsStatusText">Connecting...</span>
+                            </div>
+                            <button class="logs-toggle" onclick="clearLogs(event)" title="Clear logs">Clear</button>
+                            <button class="logs-toggle" id="logsToggleBtn">▼</button>
+                        </div>
+                    </div>
+                    <div class="logs-content" id="logsContent">
+                        <div class="log-entry">Waiting for logs...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/index.js?v=${maven.build.timestamp}"></script>
+</body>
+
+</html>
