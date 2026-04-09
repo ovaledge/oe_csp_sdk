@@ -17,6 +17,7 @@ import com.ovaledge.csp.v3.core.apps.service.SdkConnector;
 import com.ovaledge.csp.v3.core.apps.service.MetadataService;
 import com.ovaledge.csp.v3.core.apps.service.QueryService;
 import com.ovaledge.csp.v3.core.apps.utils.LogUtils;
+import com.ovaledge.csp.v3.core.apps.utils.Utils;
 import com.ovaledge.csp.v3.core.connectionpool.core.ConnectionPoolManager;
 import com.ovaledge.csp.v3.core.connectionpool.core.ConnectionResource;
 import com.ovaledge.csp.v3.core.connectionpool.enums.ResourceType;
@@ -139,6 +140,12 @@ public class MonetDBConnector extends BaseAppConnector implements AppsConnector 
         if (config == null) return null;
         ConnectionConfig.ConnectionConfigBuilder builder = config.toBuilder();
         boolean modified = false;
+        if (config.getDriverClass() == null || config.getDriverClass().isBlank()) {
+            String fromAttr = getFromAdditionalAttributes(config, MonetDBConstants.KEY_JDBC_DRIVER);
+            String driverClass = Utils.isNotBlank(fromAttr) ? fromAttr : MonetDBConstants.JDBC_DRIVER_CLASS;
+            builder.withDriverClass(driverClass);
+            modified = true;
+        }
         String jdbcUrl = config.getJdbcUrl();
         if (jdbcUrl == null || jdbcUrl.isBlank()) {
             String host = getEffectiveHost(config);
@@ -199,17 +206,25 @@ public class MonetDBConnector extends BaseAppConnector implements AppsConnector 
         database.setRequired(true);
         ConnectionAttribute username = new ConnectionAttribute(MonetDBConstants.LABEL_USERNAME, "",
                 MonetDBConstants.DESC_USERNAME, 30, MonetDBConstants.KEY_USERNAME);
+        username.setRequired(true);
         ConnectionAttribute password = new ConnectionAttribute(MonetDBConstants.LABEL_PASSWORD, "",
                 MonetDBConstants.DESC_PASSWORD, 35, MonetDBConstants.KEY_PASSWORD);
         password.setType(ConnectionAttribute.Type.PASSWORD);
         password.setMasked(true);
         password.setSecretManagerAttr(true);
+        password.setRequired(true);
+        ConnectionAttribute jdbcDriver = new ConnectionAttribute(MonetDBConstants.LABEL_JDBC_DRIVER,
+                MonetDBConstants.JDBC_DRIVER_CLASS, MonetDBConstants.DESC_JDBC_DRIVER, 40,
+                MonetDBConstants.KEY_JDBC_DRIVER);
+        jdbcDriver.setType(ConnectionAttribute.Type.HIDDEN);
+        jdbcDriver.setValue(MonetDBConstants.JDBC_DRIVER_CLASS);
 
         attributes.put(MonetDBConstants.KEY_HOST, host);
         attributes.put(MonetDBConstants.KEY_PORT, port);
         attributes.put(MonetDBConstants.KEY_DATABASE, database);
         attributes.put(MonetDBConstants.KEY_USERNAME, username);
         attributes.put(MonetDBConstants.KEY_PASSWORD, password);
+        attributes.put(MonetDBConstants.KEY_JDBC_DRIVER, jdbcDriver);
 
         getGovernanceAttributes(attributes);
         getSecurityAndGovernanceRolesAttributes(attributes);
@@ -222,8 +237,8 @@ public class MonetDBConnector extends BaseAppConnector implements AppsConnector 
         if (connInfo != null && connInfo.getAdditionalAttr() != null) {
             Map<String, ConnectionAttribute> savedAttrs = connInfo.getAdditionalAttr();
             for (String key : new String[]{
-                    MonetDBConstants.KEY_HOST, MonetDBConstants.KEY_PORT, MonetDBConstants.KEY_DATABASE,
-                    MonetDBConstants.KEY_USERNAME, MonetDBConstants.KEY_PASSWORD
+                    MonetDBConstants.KEY_JDBC_DRIVER, MonetDBConstants.KEY_HOST, MonetDBConstants.KEY_PORT,
+                    MonetDBConstants.KEY_DATABASE, MonetDBConstants.KEY_USERNAME, MonetDBConstants.KEY_PASSWORD
             }) {
                 if (savedAttrs.containsKey(key) && exchangeAttributes.containsKey(key)) {
                     ConnectionAttribute saved = savedAttrs.get(key);

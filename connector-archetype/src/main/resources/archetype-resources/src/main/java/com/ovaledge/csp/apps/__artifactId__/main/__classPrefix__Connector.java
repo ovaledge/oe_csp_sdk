@@ -136,4 +136,7 @@ public class ${classPrefix}Connector extends BaseAppConnector implements AppsCon
     public String getVaultPath(ConnInfo connInfo) {
         return super.getVaultPath(connInfo, exchangeAttributes(connInfo));
     }
+
+    // TODO: Override AppsConnector#processAppObjectsForEdgi() to implement connector-specific logic for askEdgi.
+    // This method provides a default implementation and must be overridden by all connectors.
 }

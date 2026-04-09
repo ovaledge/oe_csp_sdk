@@ -89,6 +89,10 @@
         },
         {
             "optionType": "CRAWLER_OPTIONS",
+            "optionKey": "PF"
+        },
+        {
+            "optionType": "CRAWLER_OPTIONS",
             "optionKey": "IN"
         },
         { "optionType": "CRAWLER_PREFERENCE", "optionKey": "S" },

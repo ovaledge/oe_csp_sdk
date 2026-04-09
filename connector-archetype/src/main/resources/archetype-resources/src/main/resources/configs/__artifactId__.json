@@ -93,7 +93,7 @@
     "DATABASE"
   ],
   "icons": {
-    "icon": "icons/${artifactId}.png"
+    "icon": "icons/${artifactId}.${iconExtension}"
   }
 }
 

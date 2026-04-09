@@ -15,6 +15,7 @@
         <div class="spinner"></div>
         <p id="loaderMessage">Loading...</p>
     </div>
+    <div id="connectorToastContainer" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
     <div class="container">
         <div class="header">
@@ -28,6 +29,7 @@
             <div class="header-right">
                 <button id="createConnectorBtn" class="action-btn" type="button"
                     onclick="openConnectorGeneratorModal()">
+                    <span aria-hidden="true">➕</span>
                     Create New Connector
                 </button>
             </div>
@@ -38,10 +40,10 @@
             <div class="left-panel">
                 <!-- Connector Selection Section (collapsible when a connector is selected) -->
                 <div class="section" id="selectConnectorSection">
-                    <h2 class="section-header-toggle" id="selectConnectorHeader" onclick="toggleSelectConnectorSection()" title="Click to expand or collapse">
-                        <span class="section-title-text">1. Select Connector</span>
+                    <h2 class="section-header-toggle" onclick="toggleSelectConnectorSection()" title="Click to expand or collapse">
+                        <span>1. Select Connector</span>
                         <span id="selectConnectorSelectedName" class="select-connector-selected-name"></span>
-                        <span class="section-chevron" id="selectConnectorChevron">▼</span>
+                        <span class="section-chevron">▼</span>
                     </h2>
                     <div class="select-connector-body">
                         <input type="text" id="connectorSearch" class="connector-search" placeholder="Search connectors..." autocomplete="off" aria-label="Search connectors">
@@ -55,7 +57,7 @@
                 <!-- Connection Configuration Section -->
                 <div class="section hidden" id="configSection">
                     <h2>2. Connection Configuration</h2>
-                    <p id="configPlaceholder" class="config-placeholder">
+                    <p id="configPlaceholder">
                         Select a connector to load required configuration fields.
                     </p>
                     <div class="form-container">
@@ -73,9 +75,7 @@
                 <div class="section section-compact hidden" id="metadataSection">
                     <div class="metadata-header">
                         <h2>Metadata Operations</h2>
-                        <p class="metadata-ops-hint">
-                            Choose an operation below—you'll be prompted for any required parameters.
-                        </p>
+                        <span class="metadata-ops-hint">Prompts for required parameters.</span>
                     </div>
                     <div class="actions-grid actions-grid-compact">
                         <button class="action-btn" onclick="showMetadataInputModal('getObjects')">
@@ -121,6 +121,11 @@
                                 <label for="connectorNameInput">Connector Name / Data Source<span class="required">*</span></label>
                                 <input type="text" id="connectorNameInput" placeholder="MonetDB">
                             </div>
+                            <div class="form-group">
+                                <label for="repoRootInput">Repository Root (server path)<span class="required">*</span></label>
+                                <input type="text" id="repoRootInput" placeholder="/Users/you/path/to/repo">
+                                <div class="help-text">Paste an absolute path on the machine running CSP-API.</div>
+                            </div>
                             <div class="form-group form-group-dropdown">
                                 <label>Connector Objects<span class="required">*</span></label>
                                 <div class="dropdown" id="connectorObjectsDropdown">
@@ -135,14 +140,85 @@
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label for="connectorIconInput">Connector Icon (PNG, 64×64 or 128×128, 10–200 KB)</label>
-                                <input type="file" id="connectorIconInput" accept=".png,image/png">
+                                <label for="connectorIconInput">Connector Icon (PNG/JPG/JPEG/SVG; for PNG/JPG/JPEG use 64×64 or 128×128, up to 200 KB)<span class="required">*</span></label>
+                                <input type="file" id="connectorIconInput" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" aria-required="true">
                             </div>
+                            <details class="form-group generator-section">
+                                <summary>Connector Capabilities</summary>
+                                <div class="form-group">
+                                    <label for="manifestProtocolInput">Protocol<span class="required">*</span></label>
+                                    <input type="hidden" id="manifestProtocolInput" value="REST">
+                                    <div class="protocol-row">
+                                        <div class="protocol-toggle" role="group" aria-label="Protocol">
+                                            <button type="button" class="protocol-toggle-btn active" data-value="REST" onclick="setManifestProtocol('REST')">REST</button>
+                                            <button type="button" class="protocol-toggle-btn" data-value="SOAP" onclick="setManifestProtocol('SOAP')">SOAP</button>
+                                            <button type="button" class="protocol-toggle-btn" data-value="SDK" onclick="setManifestProtocol('SDK')">SDK</button>
+                                            <button type="button" class="protocol-toggle-btn" data-value="JDBC" onclick="setManifestProtocol('JDBC')">JDBC</button>
+                                            <button type="button" class="protocol-toggle-btn" data-value="Other" onclick="setManifestProtocol('Other')">Other</button>
+                                        </div>
+                                        <div id="manifestProtocolOtherWrapper" class="hidden protocol-other-inline">
+                                            <input type="text" id="manifestProtocolOtherInput" placeholder="Other Protocol*">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="capability-group-title">Core Capabilities</div>
+                                    <div class="capability-grid">
+                                        <label class="capability-item" data-tooltip="Enables metadata crawling for supported connector objects."><input type="checkbox" id="cmCrawlingInput" checked> <span>Crawling</span></label>
+                                        <label class="capability-item" data-tooltip="Enables Query Sheet features for this connector."><input type="checkbox" id="cmQuerySheetInput" checked> <span>Query Sheet</span></label>
+                                        <label class="capability-item capability-item-readonly" data-tooltip="Profiling is currently not supported for SDK connectors."><input type="checkbox" disabled> <span>Profiling (Not supported for SDK connectors)</span></label>
+                                        <label class="capability-item capability-item-readonly" data-tooltip="Data Quality is currently not supported for SDK connectors."><input type="checkbox" disabled> <span>Data Quality (Not supported for SDK connectors)</span></label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="capability-group-title">Crawler Options</div>
+                                    <div id="crawlerOptionsCatalog" class="crawler-options-catalog"></div>
+                                </div>
+                            </details>
+                            <details class="form-group generator-section generator-section-compact">
+                                <summary>Research References</summary>
+                                <div class="help-text references-help-text">Add one or more references. Use Remove on a row you no longer need.</div>
+                                <div id="referencesContainer"></div>
+                                <div class="reference-add-row" role="group" aria-label="Add reference">
+                                    <select id="quickRefType" class="quick-ref-type" aria-label="Reference type">
+                                        <option>Official Docs</option>
+                                        <option>API Reference</option>
+                                        <option>GitHub</option>
+                                        <option>Community</option>
+                                        <option>Other</option>
+                                    </select>
+                                    <input type="text" id="quickRefTitle" class="quick-ref-title" placeholder="Title (optional)" aria-label="Reference title">
+                                    <input type="text" id="quickRefUrl" class="quick-ref-url" placeholder="Paste URL (https://...)" aria-label="Reference URL">
+                                    <input type="text" id="quickRefNotes" class="quick-ref-notes" placeholder="Notes (optional)" aria-label="Reference notes">
+                                    <button type="button" class="action-btn secondary" onclick="addReferenceRowFromQuick()">+ Add</button>
+                                </div>
+                            </details>
                         </div>
                         <div class="modal-footer">
                             <button class="action-btn secondary" onclick="closeConnectorGeneratorModal()">Cancel</button>
+                            <button class="action-btn secondary" id="connectorDownloadBtn"
+                                title="Download connector as a ZIP package with INSTRUCTIONS.txt for manual setup."
+                                onclick="downloadConnectorGeneratorZip()">Download</button>
                             <button class="action-btn" id="connectorGenerateBtn"
-                                onclick="submitConnectorGenerator()">Generate</button>
+                                title="Generate connector in the repository root and auto-wire Maven dependencies."
+                                onclick="submitConnectorGenerator()">Publish</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal for Overwrite Confirmation -->
+                <div id="overwriteConfirmModal" class="modal hidden">
+                    <div class="modal-content overwrite-confirm-content">
+                        <div class="modal-header">
+                            <h3>Confirm Overwrite</h3>
+                            <button class="modal-close" type="button" onclick="resolveOverwriteConfirm(false)">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <p id="overwriteConfirmMessage" class="overwrite-confirm-message"></p>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="action-btn secondary" type="button" onclick="resolveOverwriteConfirm(false)">Cancel</button>
+                            <button class="action-btn" type="button" onclick="resolveOverwriteConfirm(true)">Delete & Regenerate</button>
                         </div>
                     </div>
                 </div>
@@ -150,7 +226,7 @@
 
             <!-- Right Panel: Response -->
             <div class="right-panel">
-                <div class="result-section" id="resultSection">
+                <div class="result-section">
                     <div class="result-header">
                         <h3>Response</h3>
                         <div class="result-actions">
@@ -187,6 +263,7 @@
         </div>
     </div>
 
+    <script src="/js/generator-constants.js?v=${maven.build.timestamp}"></script>
     <script src="/js/index.js?v=${maven.build.timestamp}"></script>
 </body>
 

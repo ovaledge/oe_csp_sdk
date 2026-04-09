@@ -9,18 +9,19 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -62,20 +63,13 @@ public class ConnectorGeneratorController {
 
     @PostMapping(value = "/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> generateConnector(
-            @RequestParam("connectorName") String connectorName,
-            @RequestParam("objectKinds") List<String> objectKinds,
-            @RequestParam(value = "icon", required = false) MultipartFile icon) {
+            @RequestPart("request") ConnectorGeneratorRequest request,
+            @RequestPart(value = "icon", required = false) MultipartFile icon) {
 
         try {
-            ConnectorGeneratorRequest request = new ConnectorGeneratorRequest(connectorName, objectKinds);
-            ConnectorGeneratorResult result = generatorService.generate(request, icon);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            headers.setContentDispositionFormData("attachment", result.getFilename());
-            headers.setContentLength(result.getZipBytes().length);
-
-            return new ResponseEntity<>(result.getZipBytes(), headers, HttpStatus.OK);
+            Map<String, String> result = generatorService.generateToDirectory(
+                    request, icon, request != null ? request.getRepoRoot() : null);
+            return ResponseEntity.ok(result);
         } catch (ConnectorGeneratorValidationException ex) {
             return ResponseEntity.badRequest().body(errorResponse("Validation failed", ex.getErrors()));
         } catch (Exception ex) {
@@ -83,6 +77,33 @@ public class ConnectorGeneratorController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(errorResponse("Connector generation failed", List.of(ex.getMessage())));
         }
+    }
+
+    @PostMapping(value = "/generate-download", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> generateConnectorDownload(
+            @RequestPart("request") ConnectorGeneratorRequest request,
+            @RequestPart(value = "icon", required = false) MultipartFile icon) {
+        try {
+            ConnectorGeneratorResult result = generatorService.generate(request, icon);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + result.getFilename() + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(result.getZipBytes());
+        } catch (ConnectorGeneratorValidationException ex) {
+            return ResponseEntity.badRequest().body(errorResponse("Validation failed", ex.getErrors()));
+        } catch (Exception ex) {
+            logger.error("Connector zip generation failed", ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(errorResponse("Connector zip generation failed", List.of(ex.getMessage())));
+        }
+    }
+
+    @GetMapping("/default-repo-root")
+    public ResponseEntity<Map<String, String>> getDefaultRepoRoot() {
+        String repoRoot = Optional.ofNullable(System.getProperty("user.dir")).orElse("");
+        Map<String, String> response = new LinkedHashMap<>();
+        response.put("repoRoot", repoRoot);
+        return ResponseEntity.ok(response);
     }
 
     private Map<String, Object> errorResponse(String message, List<String> errors) {
