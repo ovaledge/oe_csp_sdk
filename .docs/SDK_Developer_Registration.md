@@ -336,7 +336,7 @@ Add the following to your Maven `~/.m2/settings.xml`:
 </servers>
 ```
 
-Store credentials in environment variables or a secrets manager — never hardcode them in `settings.xml` or `pom.xml`.
+Never hardcode them in `pom.xml`.
 
 ### 4.3 Credential Issuance
 

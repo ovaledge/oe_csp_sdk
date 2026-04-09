@@ -12,7 +12,7 @@ All SDK documentation is located in the [`.docs/`](.docs/) folder:
 
 | Document                                                                                  | Description |
 |-------------------------------------------------------------------------------------------|---|
-| [Getting Started with the SDK](.docs/OvalEdge_Connectors_Software_Development_Kit_new.md) | Step-by-step guide: prerequisites, IDE setup, connector development, building, testing, and deployment |
+| [Getting Started with the SDK](.docs/OvalEdge_Connectors_Software_Development_Kit.md) | Step-by-step guide: prerequisites, IDE setup, connector development, building, testing, and deployment |
 | [Connector Interface Reference](.docs/CONNECTOR_INTERFACE_REFERENCE.md)                   | Full API contract for `AppsConnector`, `MetadataService`, and `QueryService` |
 | [SDK Developer Registration & Legal](.docs/SDK_Developer_Registration.md)                 | Developer onboarding process, legal agreements by persona, security and ethical development standards, access provisioning, and compliance requirements |
 
@@ -57,7 +57,7 @@ mvn archetype:generate \
   -DinteractiveMode=false
 ```
 
-See the full [Getting Started guide](.docs/OvalEdge_Connectors_Software_Development_Kit_new.md) for all steps.
+See the full [Getting Started guide](.docs/OvalEdge_Connectors_Software_Development_Kit.md) for all steps.
 
 ---
 
@@ -90,12 +90,7 @@ To register and obtain a signed agreement, contact **developer@ovaledge.com**.
 
 ## Contributing
 
-Contributions from registered developers are welcome. Before raising a Pull Request, review the [Connector Development Model](.docs/Connector_Development_Model.md) for:
-
-- Pre-PR testing checklist
-- Automated quality gate requirements (SAST, dependency scan, secrets detection, build verification)
-- Code review standards and SLAs
-- Open Source Contributor CLA process
+Contributions from registered developers are welcome. Before raising a Pull Request, review the [Quality Guidelines](.docs/sdk/7.Development_And_Testing.md#73-code-review-standards-and-quality-gates)
 
 ---
 
