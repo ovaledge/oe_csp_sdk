@@ -1,0 +1,91 @@
+OvalEdge Connector SDK Source License
+Version 1.0, April 2026
+
+Copyright (c) 2026 OvalEdge, Inc. All Rights Reserved.
+
+DEFINITIONS
+
+"Software" means the OvalEdge Connector SDK source code, frameworks,
+libraries, sample connectors, tooling, and documentation contained in
+this repository.
+
+"OvalEdge Platform" means the OvalEdge Data Governance Platform products
+and services offered by OvalEdge, Inc.
+
+"Permitted Use" means using the Software solely to develop, test, and
+deploy connector integrations with the OvalEdge Platform, subject to a
+signed OvalEdge SDK License Agreement.
+
+"Competing Use" means using the Software, in whole or in part, to
+develop, operate, or support any product or service that competes with
+the OvalEdge Platform or any other product or service offered by
+OvalEdge, Inc.
+
+GRANT OF RIGHTS
+
+Subject to the terms of this License and a signed OvalEdge SDK License
+Agreement, OvalEdge grants you a limited, non-exclusive, non-transferable,
+revocable right to:
+
+  (a) view and fork this repository; and
+  (b) use the Software for Permitted Use only.
+
+RESTRICTIONS
+
+You may not, and you may not permit others to:
+
+  (a) use the Software for any Competing Use;
+  (b) sublicense, sell, resell, transfer, or redistribute the Software
+      or any portion thereof as a standalone product or SDK;
+  (c) reverse engineer, decompile, or disassemble the OvalEdge Platform
+      components referenced or depended upon by the Software;
+  (d) remove, alter, or obscure any copyright, trademark, or proprietary
+      notices in the Software;
+  (e) use the Software in production without a valid, signed OvalEdge
+      SDK License Agreement.
+
+To obtain a signed SDK License Agreement and production access credentials,
+contact developer@ovaledge.com.
+
+OPEN SOURCE COMPONENTS
+
+Certain third-party components included in or distributed with the
+Software are governed by their own open source licenses, which are
+identified in the applicable pom.xml dependency declarations and NOTICE
+files. This License does not alter the terms of those third-party licenses.
+
+INTELLECTUAL PROPERTY
+
+OvalEdge, Inc. retains all right, title, and interest in and to the
+Software, including all intellectual property rights therein. Nothing in
+this License transfers any ownership of the Software to you.
+
+Connectors developed by you using the Software remain subject to the
+IP ownership terms of your signed SDK License Agreement.
+
+DISCLAIMER OF WARRANTIES
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED. OVALEDGE DISCLAIMS ALL WARRANTIES INCLUDING, WITHOUT
+LIMITATION, WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, AND NON-INFRINGEMENT.
+
+LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL OVALEDGE BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF
+THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+GOVERNING LAW
+
+This License is governed by the laws of the State of Georgia, USA,
+without regard to its conflict of law principles.
+
+TERMINATION
+
+Your rights under this License terminate automatically if you breach
+any of its terms. OvalEdge may also terminate or modify this License
+with notice posted to this repository.
+
+---
+OvalEdge, Inc. | developer@ovaledge.com | https://www.ovaledge.com

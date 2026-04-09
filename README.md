@@ -1,200 +1,103 @@
-# OvalEdge Connector SDK for Java
+# OvalEdge Connectors SDK
 
-Build custom OvalEdge connectors as modular Java components to integrate external systems (databases, APIs, SaaS apps, ERPs, CRMs) into OvalEdge metadata and query workflows.
+Build and run **OvalEdge connectors** — modular Java components that connect the OvalEdge Data Governance Platform to external data sources (Databases, APIs, ERPs, CRMs, file systems, and more).
 
-This repository provides:
-- A connector development pattern (`AppsConnector` + `MetadataService` + `QueryService`)
-- Two scaffolding paths: Maven archetype (CLI) and `Create New Connector` from UI
-- A unified Spring Boot API (`csp-api`) to test connectors through one runtime
-- Reference connector implementations (for example, `monetdb`, `awsconsole`)
-- An assembly module to package connectors for deployment
+This repository contains the Connector SDK template, a unified REST API for testing connectors, reference connector implementations (MonetDB, AWS Console), and Maven tooling to scaffold new connectors.
 
-## Who This Is For
+---
 
-- Partners, customers, and internal developers building OvalEdge connectors
-- Java engineers familiar with APIs/JDBC/authentication patterns
-- Teams that need private or publishable connector implementations
+## Documentation
 
-## Prerequisites
+All SDK documentation is located in the [`.docs/`](.docs/) folder:
 
-- JDK `21`
-- Maven `3.8+`
+| Document                                                                                  | Description |
+|-------------------------------------------------------------------------------------------|---|
+| [Getting Started with the SDK](.docs/OvalEdge_Connectors_Software_Development_Kit.md) | Step-by-step guide: prerequisites, IDE setup, connector development, building, testing, and deployment |
+| [Connector Interface Reference](.docs/Connector_Interface_Reference.md)                   | Full API contract for `AppsConnector`, `MetadataService`, and `QueryService` |
+| [SDK Developer Registration & Legal](.docs/SDK_Developer_Registration.md)                 | Developer onboarding process, legal agreements by persona, security and ethical development standards, access provisioning, and compliance requirements |
+
+---
+
+## Quick Start
+
+**1. Register as an OvalEdge SDK Developer**
+
+Send your details to **developer@ovaledge.com** — see the [Registration Guide](.docs/SDK_Developer_Registration.md) for required information. Access credentials are issued after your SDK agreement is signed.
+
+**2. Fork this repository**
+
+```bash
+git fork https://github.com/ovaledge/oe_csp_sdk
+```
+
+**3. Set up prerequisites**
+
+- JDK 21 (`JAVA_HOME` must point to JDK 21)
+- Maven 3.8+
 - Git
-- Access to required dependencies and credentials (for private repositories, if applicable)
+
+**4. Build and verify**
+
+```bash
+mvn clean install -DskipTests
+```
+
+**5. Generate a new connector**
+
+```bash
+mvn archetype:generate \
+  -DarchetypeGroupId=com.ovaledge \
+  -DarchetypeArtifactId=oe-csp-connector-archetype \
+  -DgroupId=com.ovaledge \
+  -DarchetypeVersion=1.0.0-SNAPSHOT \
+  -DartifactId=myconnector \
+  -Dversion=1.0.0-SNAPSHOT \
+  -DclassPrefix=MyConnector \
+  -DsdkVersion=1.0.0-SNAPSHOT \
+  -DinteractiveMode=false
+```
+
+See the full [Getting Started guide](.docs/OvalEdge_Connectors_Software_Development_Kit.md) for all steps.
+
+---
 
 ## Repository Structure
 
-- `csp-api` - Unified REST runtime for connector testing (`/v1/*`)
-- `connector-archetype` - Maven archetype to generate a new connector module
-- `assembly` - Builds deployable assembly JAR with connector discovery metadata
-- `monetdb` - JDBC-style reference implementation
-- `awsconsole` - API-style reference implementation
-- `.docs` - Extended SDK documentation
+| Module / File | Purpose |
+|---|---|
+| `assembly/` | Builds the single shaded JAR containing all connectors for deployment |
+| `connector-archetype/` | Maven archetype to scaffold a new connector module |
+| `csp-api/` | Spring Boot REST gateway for testing all connectors locally |
+| `monetdb/` | Reference JDBC connector (MonetDB) |
+| `awsconsole/` | Reference REST/SDK connector (AWS Console) |
+| `.docs/` | SDK documentation |
+| `build-csp-sdk.sh` | Convenience script to build the assembly JAR |
+| `pom.xml` | Root Maven POM — modules, dependency management, shared build config |
 
-## Quick Start (5 Minutes)
+---
 
-1. Clone the repository and open at project root.
-2. Build all modules:
+## License
 
-```bash
-mvn clean install -DskipTests
-```
+This repository is governed by the [OvalEdge Connector SDK Source License](LICENSE).
 
-3. Run unified test runtime:
+Use of this Software is restricted to building connector integrations with the OvalEdge Data Governance Platform. **Production use requires a signed OvalEdge SDK License Agreement.**
 
-```bash
-java -jar csp-api/target/csp-api-1.0.0-SNAPSHOT.jar
-```
+To register and obtain a signed agreement, contact **developer@ovaledge.com**.
 
-4. Verify available connectors:
+> This is a **source available** repository, not an open source project. Forking and contributing are welcome under the terms of the License; use for competing products or platforms is not permitted.
 
-```bash
-curl http://localhost:8800/v1/info
-```
+---
 
-5. Validate connection (example using `monetdb`):
+## Contributing
 
-```bash
-curl -X POST http://localhost:8800/v1/connection/validate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "serverType": "monetdb",
-    "attributes": {
-      "host": "localhost",
-      "port": "50000",
-      "database": "demo",
-      "username": "monetdb",
-      "password": "monetdb"
-    }
-  }'
-```
+Contributions from registered developers are welcome. Before raising a Pull Request, review the [Quality Guidelines](.docs/sdk/07.Development_And_Testing.md#73-code-review-standards-and-quality-gates)
 
-## Build a New Connector
+---
 
-You can scaffold a new connector using either approach:
+## Support
 
-- **Option A (CLI):** Maven archetype (`connector-archetype`)
-- **Option B (UI):** `Create New Connector` flow in `csp-api` UI
-
-### 1) Generate Connector Scaffold (Option A: CLI)
-
-Install archetype once from repository root:
-
-```bash
-mvn clean install -pl connector-archetype -am
-```
-
-Generate a new connector module using the archetype (non-interactive recommended in CI/local scripts).
-
-### 1b) Generate Connector Scaffold (Option B: UI)
-
-1. Start `csp-api`.
-2. Open the UI in your browser.
-3. Click **Create New Connector**.
-4. Provide connector details and generate/download the scaffold package.
-5. Place generated sources in repository root if you downloaded as ZIP, then import as Maven module.
-
-Use the CLI path if you prefer scriptable/repeatable generation. Use the UI path for faster guided setup.
-
-### 2) Implement Connector Contracts
-
-Every connector module should implement:
-- `AppsConnector`
-- `MetadataService`
-- `QueryService`
-
-At minimum, ensure:
-- Unique lowercase `serverType` (for request routing)
-- Connection validation logic
-- Supported objects, containers, objects, and fields metadata flow
-- Query execution (`fetchData`) with sane pagination behavior
-
-### 3) Register with ServiceLoader
-
-Add connector implementation to:
-
-`META-INF/services/com.ovaledge.csp.v3.core.apps.service.AppsConnector`
-
-Without this registration, runtime discovery will fail.
-
-### 4) Add to Runtime
-
-Add your module dependency in `csp-api/pom.xml`, rebuild, restart `csp-api`, then verify using:
-
-```bash
-curl http://localhost:8800/v1/info
-```
-
-## Development Checklist
-
-- Connector classes compile and are discoverable via ServiceLoader
-- `serverType` is unique and stable
-- Metadata APIs return deterministic, paginatable responses
-- Query logic supports limits/offsets and safe filtering where applicable
-- Error responses are actionable (auth/network/schema issues are distinguishable)
-- No sensitive credentials are printed in logs
-
-## Testing
-
-Common build/test commands:
-
-```bash
-# Build all modules
-mvn clean install -DskipTests
-
-# Build a specific connector and dependencies
-mvn clean install -pl monetdb -am
-
-# Run tests
-mvn test
-```
-
-Recommended test coverage per connector:
-- Connection success/failure scenarios
-- Metadata traversal (supported objects -> containers -> objects -> fields)
-- Query behavior (pagination, empty sets, invalid entity/container inputs)
-- Error handling for source outages and invalid credentials
-
-## Packaging and Deployment
-
-- Use module build for local connector iteration
-- Use `assembly` for deployable SDK bundle consumption
-- If available in your environment, use helper scripts (for example, `build-csp-sdk.sh`) from repository root
-
-Before release:
-- Version bump per release policy
-- Update connector config metadata and icons (if applicable)
-- Validate on a clean environment with production-like credentials
-
-## Security and Operational Guidance
-
-- Keep secrets in secure stores and environment variables; avoid hardcoding
-- Mask tokens/passwords in logs and error payloads
-- Use least-privilege source credentials
-- Apply connection and query timeouts to avoid hanging calls
-- Validate and sanitize dynamic query inputs
-
-## Troubleshooting
-
-- Connector not listed in `/v1/info`
-  - Check `META-INF/services` registration and classpath/module dependency
-- `No connector found for serverType`
-  - Confirm request `serverType` matches connector `getServerType()`
-- Build succeeds but runtime fails
-  - Rebuild with `-am`, restart runtime, verify dependency inclusion in `csp-api`
-- Authentication failures
-  - Verify source credentials/tenant/account scope and connector attribute mapping
-- Metadata empty unexpectedly
-  - Validate source permissions and object-type filters
-
-## Reference Implementations
-
-- `monetdb` - JDBC-style connector pattern
-- `awsconsole` - API-style connector pattern
-
-Use these modules as implementation templates when building new connectors.
-
-## Additional Documentation
-
-- Complete SDK guide: [`OvalEdge Connectors Software Development Kit`](.docs/OvalEdge%20Connectors%20Software%20Development%20Kit.md)
-
+| Topic | Contact                                       |
+|---|-----------------------------------------------|
+| Developer registration & onboarding | developer@ovaledge.com                     |
+| Security vulnerabilities & responsible disclosure | security@ovaledge.com |
+| OvalEdge platform documentation | https://docs.ovaledge.com                     |
