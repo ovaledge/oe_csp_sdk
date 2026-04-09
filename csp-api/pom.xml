@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.ovaledge</groupId>
         <artifactId>oe-csp-sdk</artifactId>
-        <version>8.1.0-SNAPSHOT</version>
+        <version>1.0.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>csp-api</artifactId>
@@ -39,7 +39,7 @@
             <artifactId>awsconsole</artifactId>
         </dependency>
 
-        <!-- Add new Connector dependencies here -->
+<!-- Connector generator marker (dependencies): DO NOT REMOVE. New connector dependencies are inserted above this line. -->
 
         <!-- Spring Boot -->
         <dependency>
@@ -138,6 +138,14 @@
                 <excludes>
                     <exclude>static/index.html</exclude>
                 </excludes>
+            </resource>
+            <!-- Ensure SDK release metadata is available to the generator at runtime -->
+            <resource>
+                <directory>../assembly/src/main/resources</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>release-csp-sdk.properties</include>
+                </includes>
             </resource>
         </resources>
         <plugins>

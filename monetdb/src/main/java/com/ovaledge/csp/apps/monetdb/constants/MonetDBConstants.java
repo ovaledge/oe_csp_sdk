@@ -15,6 +15,8 @@ public final class MonetDBConstants {
     public static final String KEY_DATABASE = "MONETDB_DATABASE";
     public static final String KEY_USERNAME = "MONETDB_USERNAME";
     public static final String KEY_PASSWORD = "MONETDB_PASSWORD";
+    /** Persisted JDBC driver class; hidden in UI. Resolved into ConnectionConfig.driverClass. */
+    public static final String KEY_JDBC_DRIVER = "MONETDB_JDBC_DRIVER";
 
     // ===== LABELS =====
     public static final String LABEL_HOST = "Host";
@@ -22,6 +24,7 @@ public final class MonetDBConstants {
     public static final String LABEL_DATABASE = "Database";
     public static final String LABEL_USERNAME = "Username";
     public static final String LABEL_PASSWORD = "Password";
+    public static final String LABEL_JDBC_DRIVER = "JDBC driver class";
 
     // ===== DESCRIPTIONS =====
     public static final String DESC_HOST = "MonetDB server host name or IP address";
@@ -29,6 +32,7 @@ public final class MonetDBConstants {
     public static final String DESC_DATABASE = "Database name";
     public static final String DESC_USERNAME = "Database user name";
     public static final String DESC_PASSWORD = "Database password";
+    public static final String DESC_JDBC_DRIVER = "MonetDB JDBC driver class (fixed default; advanced override)";
 
     // ===== JDBC =====
     public static final String JDBC_DRIVER_CLASS = "org.monetdb.jdbc.MonetDriver";

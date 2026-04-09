@@ -1,6 +1,15 @@
 
-const API_BASE = '/v1';
-const CONNECTOR_LIST_INITIAL_COUNT = 5;
+const {
+    API_BASE,
+    CONNECTOR_LIST_INITIAL_COUNT,
+    CRAWLER_OPTION_TYPE_ORDER,
+    CRAWLER_OPTION_TYPES_HIDDEN_FOR_SDK,
+    CRAWLER_OPTION_CODES_HIDDEN_FOR_SDK,
+    CRAWLER_OPTION_CATALOG,
+    CRAWLER_OPTION_TOOLTIP_DETAILS,
+    CONNECTOR_OBJECT_CATEGORY_ORDER,
+    CONNECTOR_OBJECT_CATEGORY_TOOLTIPS
+} = window.CONNECTOR_UI_CONSTANTS;
 let selectedConnector = null;
 let connectorAttributes = null;
 let connectionConfig = {};
@@ -9,6 +18,7 @@ let lastRequestParams = null;
 let lastResponseData = null;
 let allConnectorsList = [];
 let connectorListShowAll = false;
+let overwriteConfirmResolver = null;
 /** Object kinds for Create Connector modal; loaded from GET /v1/generator/object-kinds (ObjectKind enum). */
 let generatorObjectKinds = null;
 
@@ -38,7 +48,8 @@ function updateResultButtons() {
     const copyCurlBtn = document.getElementById('copyCurlBtn');
     const copyResponseBtn = document.getElementById('copyResponseBtn');
     const hasResponse = !!lastResponseData;
-    if (copyCurlBtn) copyCurlBtn.disabled = !hasResponse;
+    const hasRequest = !!lastRequestParams;
+    if (copyCurlBtn) copyCurlBtn.disabled = !hasRequest;
     if (copyResponseBtn) copyResponseBtn.disabled = !hasResponse;
 }
 
@@ -47,6 +58,7 @@ function openConnectorGeneratorModal() {
     if (!modal) return;
     clearConnectorGeneratorError();
     modal.classList.remove('hidden');
+    prefillRepoRootIfEmpty();
     const list = document.getElementById('connectorObjectsList');
     const placeholder = document.getElementById('connectorObjectsLabel');
     if (list) list.innerHTML = '';
@@ -73,6 +85,25 @@ function openConnectorGeneratorModal() {
             }
             showConnectorGeneratorError('Failed to load connector object types: ' + (err.message || 'Unknown error'));
         });
+    ensureDefaultManifestInputs();
+    renderCrawlerOptionsCatalog();
+    updateConnectorGeneratorActionButtons();
+}
+
+async function prefillRepoRootIfEmpty() {
+    const repoRootInput = document.getElementById('repoRootInput');
+    if (!repoRootInput) return;
+    if (repoRootInput.value && repoRootInput.value.trim()) return;
+    try {
+        const response = await fetch(`${API_BASE}/generator/default-repo-root`);
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (payload && payload.repoRoot) {
+            repoRootInput.value = payload.repoRoot;
+        }
+    } catch (e) {
+        // ignore
+    }
 }
 
 async function fetchObjectKinds() {
@@ -110,23 +141,306 @@ function resetConnectorGeneratorForm() {
     if (dropdownLabel) dropdownLabel.textContent = 'Select connector objects';
     clearConnectorGeneratorError();
     renderConnectorObjectPills();
+    const refsContainer = document.getElementById('referencesContainer');
+    if (refsContainer) refsContainer.innerHTML = '';
+    ensureDefaultManifestInputs();
+    renderCrawlerOptionsCatalog();
+    updateConnectorGeneratorActionButtons();
 }
 
-/** Category display order for Connector Objects dropdown (shown side by side). Only object-level kinds are listed; CONTAINER is not selectable. */
-const CONNECTOR_OBJECT_CATEGORY_ORDER = [
-    'Database objects',
-    'Storage',
-    'Reporting',
-    'Other'
-];
+function ensureDefaultManifestInputs() {
+    const defaults = [
+        ['manifestProtocolInput', 'REST']
+    ];
+    defaults.forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (el && !el.value) el.value = val;
+    });
+    const protocolValue = document.getElementById('manifestProtocolInput')?.value || 'REST';
+    setManifestProtocol(protocolValue);
+}
 
-/** User-friendly tooltips for category headers in the Connector Objects dropdown. */
-const CONNECTOR_OBJECT_CATEGORY_TOOLTIPS = {
-    'Database objects': 'Table-like objects, views, and database routines (functions, procedures, sequences, indexes, triggers).',
-    'Storage': 'File objects inside containers (e.g. folders or files).',
-    'Reporting': 'Reports from reporting or BI sources.',
-    'Other': 'Other object types supported by the connector.'
-};
+function getReferenceSummary(card) {
+    const type = (card.querySelector('.ref-type')?.value || 'Reference').trim();
+    const title = (card.querySelector('.ref-title')?.value || '').trim();
+    const url = (card.querySelector('.ref-url')?.value || '').trim();
+    const secondary = title || url || 'Untitled reference';
+    return { type, secondary };
+}
+
+function updateReferenceCardSummary(card) {
+    if (!card) return;
+    const summary = getReferenceSummary(card);
+    const typeEl = card.querySelector('.ref-summary-type');
+    const valueEl = card.querySelector('.ref-summary-value');
+    if (typeEl) typeEl.textContent = summary.type;
+    if (valueEl) valueEl.textContent = summary.secondary;
+    updateReferenceCardPreview(card);
+}
+
+function updateReferenceCardPreview(card) {
+    if (!card) return;
+    const type = (card.querySelector('.ref-type')?.value || 'Reference').trim();
+    const title = (card.querySelector('.ref-title')?.value || '').trim();
+    const url = (card.querySelector('.ref-url')?.value || '').trim();
+    const notes = (card.querySelector('.ref-text')?.value || '').trim();
+    const previewEl = card.querySelector('.ref-preview-popover');
+    if (!previewEl) return;
+    previewEl.textContent =
+        'Type: ' + type + '\n'
+        + 'Title: ' + (title || '-') + '\n'
+        + 'URL: ' + (url || '-') + '\n'
+        + 'Notes: ' + (notes || '-');
+}
+
+function setActiveReferenceCard(activeCard) {
+    const container = document.getElementById('referencesContainer');
+    if (!container) return;
+    container.querySelectorAll('.reference-card').forEach(card => {
+        const expanded = card === activeCard;
+        card.classList.toggle('expanded', expanded);
+        const headerBtn = card.querySelector('.reference-card-header');
+        if (headerBtn) headerBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        const body = card.querySelector('.reference-card-body');
+        if (body) body.classList.toggle('hidden', !expanded);
+    });
+}
+
+function removeReferenceCard(btn) {
+    const card = btn.closest('.reference-card');
+    if (!card) return;
+    card.remove();
+}
+
+function addReferenceRowFromQuick() {
+    const quickType = document.getElementById('quickRefType');
+    const quickUrl = document.getElementById('quickRefUrl');
+    const quickTitle = document.getElementById('quickRefTitle');
+    const quickNotes = document.getElementById('quickRefNotes');
+    const type = (quickType?.value || 'Official Docs').trim();
+    const url = (quickUrl?.value || '').trim();
+    const title = (quickTitle?.value || '').trim();
+    const text = (quickNotes?.value || '').trim();
+    if (!url) {
+        showConnectorGeneratorError('Please enter a URL before adding a reference.');
+        return;
+    }
+    clearConnectorGeneratorError();
+    addReferenceRow({ type, url, title, text });
+    if (quickUrl) quickUrl.value = '';
+    if (quickTitle) quickTitle.value = '';
+    if (quickNotes) quickNotes.value = '';
+}
+
+function addReferenceRow(initial = {}) {
+    const container = document.getElementById('referencesContainer');
+    if (!container) return;
+    const cardId = 'reference-card-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    const card = document.createElement('div');
+    card.className = 'reference-card';
+    card.innerHTML = `
+        <div class="reference-card-header" role="button" tabindex="0" aria-expanded="false" aria-controls="${cardId}">
+            <span class="ref-summary-type"></span>
+            <span class="ref-summary-value"></span>
+            <span class="ref-summary-edit-icon" aria-hidden="true" title="Expand to edit">
+                <svg viewBox="0 0 24 24" focusable="false">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L8 18l-4 1 1-4 11.5-11.5z"/>
+                </svg>
+            </span>
+            <button type="button" class="ref-preview-btn ref-preview-trigger" aria-label="Preview reference" title="Preview">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M5 3h9l5 5v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm8 1.5V9h4.5L13 4.5zM12 11c4.1 0 6.5 3.6 6.7 3.9a1 1 0 0 1 0 1.1c-.2.3-2.6 3.9-6.7 3.9S5.5 16.3 5.3 16a1 1 0 0 1 0-1.1C5.5 14.6 7.9 11 12 11zm0 1.8c-2.4 0-4 1.7-4.7 2.6.7.9 2.3 2.6 4.7 2.6s4-1.7 4.7-2.6c-.7-.9-2.3-2.6-4.7-2.6zm0 1a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2z"/>
+                </svg>
+            </button>
+            <button type="button" class="ref-remove-btn" aria-label="Remove this reference" title="Remove">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" d="M7 7l10 10M17 7L7 17"/>
+                </svg>
+            </button>
+            <div class="ref-preview-popover" role="tooltip"></div>
+        </div>
+        <div class="reference-card-body hidden" id="${cardId}">
+            <div class="reference-grid-row">
+                <div class="form-group">
+                    <label>Type</label>
+                    <select class="ref-type">
+                        <option>Official Docs</option>
+                        <option>API Reference</option>
+                        <option>GitHub</option>
+                        <option>Community</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" class="ref-title" placeholder="Optional title">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>URL</label>
+                <input type="text" class="ref-url" placeholder="https://...">
+            </div>
+            <div class="form-group ref-notes-wrap">
+                <label>Notes / Text</label>
+                <textarea class="ref-text" rows="2" placeholder="Paste relevant research notes"></textarea>
+            </div>
+        </div>
+    `;
+    container.appendChild(card);
+
+    const typeInput = card.querySelector('.ref-type');
+    const titleInput = card.querySelector('.ref-title');
+    const urlInput = card.querySelector('.ref-url');
+    const textInput = card.querySelector('.ref-text');
+    if (typeInput && initial.type) typeInput.value = initial.type;
+    if (titleInput && initial.title) titleInput.value = initial.title;
+    if (urlInput && initial.url) urlInput.value = initial.url;
+    if (textInput && initial.text) {
+        textInput.value = initial.text;
+    }
+
+    const header = card.querySelector('.reference-card-header');
+    card.querySelector('.ref-preview-btn')?.addEventListener('click', (e) => e.stopPropagation());
+    card.querySelector('.ref-remove-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        removeReferenceCard(e.currentTarget);
+    });
+    header?.addEventListener('click', () => {
+        const isExpanded = card.classList.contains('expanded');
+        setActiveReferenceCard(isExpanded ? null : card);
+    });
+    header?.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        const isExpanded = card.classList.contains('expanded');
+        setActiveReferenceCard(isExpanded ? null : card);
+    });
+    [typeInput, titleInput, urlInput].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', () => updateReferenceCardSummary(card));
+        el.addEventListener('change', () => updateReferenceCardSummary(card));
+    });
+    updateReferenceCardSummary(card);
+    setActiveReferenceCard(null);
+}
+
+function toggleProtocolOtherInput() {
+    const select = document.getElementById('manifestProtocolInput');
+    const other = document.getElementById('manifestProtocolOtherInput');
+    const otherWrapper = document.getElementById('manifestProtocolOtherWrapper');
+    if (!select || !other || !otherWrapper) return;
+    if (select.value === 'Other') {
+        otherWrapper.classList.remove('hidden');
+    } else {
+        otherWrapper.classList.add('hidden');
+        other.value = '';
+    }
+}
+
+function setManifestProtocol(value) {
+    const input = document.getElementById('manifestProtocolInput');
+    if (!input) return;
+    input.value = value;
+    document.querySelectorAll('.protocol-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === value);
+    });
+    toggleProtocolOtherInput();
+    updateConnectorGeneratorActionButtons();
+}
+
+function renderCrawlerOptionsCatalog() {
+    const container = document.getElementById('crawlerOptionsCatalog');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const groupedByType = new Map();
+    CRAWLER_OPTION_CATALOG.forEach(item => {
+        const key = item.optionType;
+        if (!groupedByType.has(key)) groupedByType.set(key, []);
+        groupedByType.get(key).push(item);
+    });
+
+    CRAWLER_OPTION_TYPE_ORDER.forEach(type => {
+        if (CRAWLER_OPTION_TYPES_HIDDEN_FOR_SDK_SET.has(type)) {
+            return;
+        }
+        const items = groupedByType.get(type);
+        if (!items || items.length === 0) return;
+
+        const section = document.createElement('div');
+        section.className = 'crawler-type-section';
+
+        const title = document.createElement('div');
+        title.className = 'crawler-type-title';
+        title.textContent = type.replace(/_/g, ' ');
+        section.appendChild(title);
+
+        const grid = document.createElement('div');
+        grid.className = 'crawler-option-grid';
+
+        items.forEach(item => {
+            if (item.optionType === 'CRAWLER_OPTIONS' && CRAWLER_OPTION_CODES_HIDDEN_FOR_SDK_SET.has(item.code)) {
+                return;
+            }
+            const label = document.createElement('label');
+            label.className = 'capability-item crawler-option-item' + ((item.required || item.disabled) ? ' capability-item-readonly' : '');
+            const tip = buildCrawlerOptionTooltip(item);
+            label.dataset.tooltip = tip;
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.className = 'crawler-option-checkbox';
+            input.dataset.optionType = item.optionType;
+            input.dataset.optionKey = item.code;
+            input.checked = Boolean(item.defaultChecked || item.required);
+            input.disabled = Boolean(item.required || item.disabled);
+
+            const textWrap = document.createElement('span');
+            textWrap.className = 'crawler-option-text';
+            const name = document.createElement('span');
+            name.className = 'crawler-option-name';
+            name.textContent = item.code + ' - ' + item.name;
+            textWrap.appendChild(name);
+
+            label.appendChild(input);
+            label.appendChild(textWrap);
+            grid.appendChild(label);
+        });
+        section.appendChild(grid);
+        container.appendChild(section);
+    });
+}
+
+function buildCrawlerOptionTooltip(item) {
+    const detail = CRAWLER_OPTION_TOOLTIP_DETAILS[item.code];
+    const base = detail || item.description;
+    const unsupported = item.disabled ? ' This option is currently not supported for SDK connectors.' : '';
+    return base + unsupported + ' [' + item.optionType + ' | ' + item.category + ']';
+}
+
+function buildCrawlerOptionsFromForm() {
+    const options = [];
+    const dedupe = new Set();
+    document.querySelectorAll('.crawler-option-checkbox:checked').forEach(input => {
+        const optionType = (input.dataset.optionType || '').trim();
+        const optionKey = (input.dataset.optionKey || '').trim();
+        if (!optionType || !optionKey) return;
+        const token = optionType + ':' + optionKey;
+        if (dedupe.has(token)) return;
+        dedupe.add(token);
+        options.push({ optionType, optionKey });
+    });
+    // Keep mandatory crawler preferences always present.
+    if (!dedupe.has('CRAWLER_PREFERENCE:S')) options.push({ optionType: 'CRAWLER_PREFERENCE', optionKey: 'S' });
+    if (!dedupe.has('CRAWLER_PREFERENCE:C')) options.push({ optionType: 'CRAWLER_PREFERENCE', optionKey: 'C' });
+    return options;
+}
+
+const CRAWLER_OPTION_TYPES_HIDDEN_FOR_SDK_SET = new Set(CRAWLER_OPTION_TYPES_HIDDEN_FOR_SDK);
+const CRAWLER_OPTION_CODES_HIDDEN_FOR_SDK_SET = new Set(CRAWLER_OPTION_CODES_HIDDEN_FOR_SDK);
+
+let activeConnectorObjectsCategory = null;
 
 function populateConnectorObjectKinds() {
     const list = document.getElementById('connectorObjectsList');
@@ -135,6 +449,10 @@ function populateConnectorObjectKinds() {
 
     const searchWrap = document.createElement('div');
     searchWrap.className = 'dropdown-search-wrap';
+
+    const headerRow = document.createElement('div');
+    headerRow.className = 'dropdown-header-row';
+
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.className = 'dropdown-search';
@@ -142,7 +460,52 @@ function populateConnectorObjectKinds() {
     searchInput.setAttribute('aria-label', 'Search connector objects');
     searchInput.addEventListener('input', filterConnectorObjectsSearch);
     searchInput.addEventListener('click', (e) => e.stopPropagation());
-    searchWrap.appendChild(searchInput);
+
+    const actions = document.createElement('div');
+    actions.className = 'dropdown-actions';
+    const selectedCount = document.createElement('span');
+    selectedCount.className = 'dropdown-selected-count';
+    selectedCount.id = 'connectorObjectsSelectedCount';
+    selectedCount.textContent = '0 selected';
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'dropdown-action-btn';
+    clearBtn.textContent = 'Clear';
+    clearBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setConnectorObjectsChecked(false, { onlyVisible: false });
+    });
+    const selectAllBtn = document.createElement('button');
+    selectAllBtn.type = 'button';
+    selectAllBtn.className = 'dropdown-action-btn primary';
+    selectAllBtn.textContent = 'Select all';
+    selectAllBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setConnectorObjectsChecked(true, { onlyVisible: true });
+    });
+    actions.appendChild(selectedCount);
+    actions.appendChild(clearBtn);
+    actions.appendChild(selectAllBtn);
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'dropdown-action-btn close';
+    closeBtn.setAttribute('aria-label', 'Close connector objects selector');
+    closeBtn.textContent = '✕';
+    closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeConnectorObjectsDropdown();
+    });
+    actions.appendChild(closeBtn);
+
+    headerRow.appendChild(searchInput);
+    headerRow.appendChild(actions);
+    searchWrap.appendChild(headerRow);
+
+    const tabs = document.createElement('div');
+    tabs.className = 'dropdown-tabs';
+    tabs.id = 'connectorObjectsTabs';
+    searchWrap.appendChild(tabs);
+
     list.appendChild(searchWrap);
 
     const optionsContainer = document.createElement('div');
@@ -152,10 +515,19 @@ function populateConnectorObjectKinds() {
     const kinds = generatorObjectKinds || [];
     const byCategory = {};
     kinds.forEach(kind => {
-        const category = kind.category || 'Other';
+        const category = (kind.category || 'Other').trim() || 'Other';
         if (!byCategory[category]) byCategory[category] = [];
         byCategory[category].push(kind);
     });
+
+    const allCategories = [
+        ...CONNECTOR_OBJECT_CATEGORY_ORDER.filter(c => byCategory[c] && byCategory[c].length > 0),
+        ...Object.keys(byCategory).filter(c => !CONNECTOR_OBJECT_CATEGORY_ORDER.includes(c))
+    ];
+    if (!activeConnectorObjectsCategory || !byCategory[activeConnectorObjectsCategory]) {
+        activeConnectorObjectsCategory = allCategories[0] || null;
+    }
+    renderConnectorObjectsTabs(allCategories, byCategory);
 
     CONNECTOR_OBJECT_CATEGORY_ORDER.forEach(category => {
         const items = byCategory[category];
@@ -167,7 +539,7 @@ function populateConnectorObjectKinds() {
         header.className = 'dropdown-category-header';
         header.textContent = category;
         header.setAttribute('aria-hidden', 'true');
-        const categoryTooltip = CONNECTOR_OBJECT_CATEGORY_TOOLTIPS[category];
+        const categoryTooltip = CONNECTOR_OBJECT_CATEGORY_TOOLTIPS[category] || CONNECTOR_OBJECT_CATEGORY_TOOLTIPS['Storage'];
         if (categoryTooltip) header.title = categoryTooltip;
         group.appendChild(header);
         items.forEach(kind => {
@@ -245,6 +617,31 @@ function populateConnectorObjectKinds() {
         optionsContainer.appendChild(group);
     });
     list.appendChild(optionsContainer);
+    updateConnectorObjectsSelectedCount();
+    filterConnectorObjectsSearch();
+}
+
+function renderConnectorObjectsTabs(categories, byCategory) {
+    const tabs = document.getElementById('connectorObjectsTabs');
+    if (!tabs) return;
+    tabs.innerHTML = '';
+    categories.forEach(category => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'dropdown-tab';
+        if (category === activeConnectorObjectsCategory) btn.classList.add('active');
+        const tooltip = CONNECTOR_OBJECT_CATEGORY_TOOLTIPS[category];
+        if (tooltip) btn.title = tooltip;
+        const count = (byCategory[category] || []).length;
+        btn.innerHTML = `<span class="dropdown-tab-label">${escapeHtml(category)}</span><span class="dropdown-tab-count">${count}</span>`;
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            activeConnectorObjectsCategory = category;
+            renderConnectorObjectsTabs(categories, byCategory);
+            filterConnectorObjectsSearch();
+        });
+        tabs.appendChild(btn);
+    });
 }
 
 function filterConnectorObjectsSearch() {
@@ -263,9 +660,14 @@ function filterConnectorObjectsSearch() {
         if (show) visibleCount++;
     });
     categories.forEach(group => {
+        const categoryName = group.dataset.category || '';
         const groupOptions = group.querySelectorAll('.dropdown-option');
         const anyVisible = Array.from(groupOptions).some(o => o.style.display !== 'none');
-        group.style.display = anyVisible ? '' : 'none';
+        if (q) {
+            group.style.display = anyVisible ? '' : 'none';
+        } else {
+            group.style.display = (anyVisible && (!activeConnectorObjectsCategory || categoryName === activeConnectorObjectsCategory)) ? '' : 'none';
+        }
     });
     let noResults = optionsContainer.querySelector('.dropdown-no-results');
     if (q && visibleCount === 0) {
@@ -279,6 +681,41 @@ function filterConnectorObjectsSearch() {
     } else if (noResults) {
         noResults.style.display = 'none';
     }
+}
+
+function setConnectorObjectsChecked(checked, { onlyVisible }) {
+    const list = document.getElementById('connectorObjectsList');
+    if (!list) return;
+    const optionsContainer = document.getElementById('connectorObjectsOptions');
+    if (!optionsContainer) return;
+    const inputs = optionsContainer.querySelectorAll('input[type="checkbox"]');
+    inputs.forEach(input => {
+        const option = input.closest('.dropdown-option');
+        const visible = option ? option.style.display !== 'none' : true;
+        if (!onlyVisible || visible) {
+            input.checked = checked;
+        }
+    });
+    renderConnectorObjectPills();
+    updateConnectorObjectsDropdownLabel();
+    updateConnectorObjectsSelectedCount();
+    updateConnectorGeneratorActionButtons();
+}
+
+function updateConnectorObjectsSelectedCount() {
+    const el = document.getElementById('connectorObjectsSelectedCount');
+    if (!el) return;
+    const selected = getSelectedConnectorObjects();
+    el.textContent = `${selected.length} selected`;
+}
+
+function escapeHtml(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function getSelectedConnectorObjects() {
@@ -312,6 +749,7 @@ function renderConnectorObjectPills() {
         pillList.appendChild(pill);
     });
     pillList.classList.remove('hidden');
+    updateConnectorObjectsSelectedCount();
 }
 
 let connectorObjectsMenuPositionListener = null;
@@ -430,9 +868,55 @@ document.addEventListener('keydown', event => {
 
 function showConnectorGeneratorError(message) {
     const errorEl = document.getElementById('connectorGeneratorError');
-    if (!errorEl) return;
-    errorEl.textContent = message;
-    errorEl.classList.remove('hidden');
+    if (errorEl) {
+        // Keep inline container cleared; primary UX is toast.
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+    }
+    showConnectorToast(message, 'error');
+}
+
+function isConnectorGeneratorRequiredFieldsValid() {
+    const connectorName = (document.getElementById('connectorNameInput')?.value || '').trim();
+    const repoRoot = (document.getElementById('repoRootInput')?.value || '').trim();
+    const selectedKinds = getSelectedConnectorObjects();
+    const protocolSelected = (document.getElementById('manifestProtocolInput')?.value || '').trim();
+    const protocolOther = (document.getElementById('manifestProtocolOtherInput')?.value || '').trim();
+    const protocol = protocolSelected === 'Other' ? protocolOther : protocolSelected;
+    const iconInput = document.getElementById('connectorIconInput');
+    const hasIcon = Boolean(iconInput && iconInput.files && iconInput.files.length > 0);
+    return Boolean(connectorName && repoRoot && selectedKinds.length > 0 && protocol && hasIcon);
+}
+
+function updateConnectorGeneratorActionButtons() {
+    const modal = document.getElementById('connectorGeneratorModal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    const canSubmit = isConnectorGeneratorRequiredFieldsValid();
+    const publishBtn = document.getElementById('connectorGenerateBtn');
+    const downloadBtn = document.getElementById('connectorDownloadBtn');
+    if (publishBtn) publishBtn.disabled = !canSubmit;
+    if (downloadBtn) downloadBtn.disabled = !canSubmit;
+}
+
+function showOverwriteConfirmDialog(message) {
+    const modal = document.getElementById('overwriteConfirmModal');
+    const messageEl = document.getElementById('overwriteConfirmMessage');
+    if (!modal || !messageEl) {
+        return Promise.resolve(false);
+    }
+    messageEl.textContent = message;
+    modal.classList.remove('hidden');
+    return new Promise(resolve => {
+        overwriteConfirmResolver = resolve;
+    });
+}
+
+function resolveOverwriteConfirm(confirmed) {
+    const modal = document.getElementById('overwriteConfirmModal');
+    if (modal) modal.classList.add('hidden');
+    const resolver = overwriteConfirmResolver;
+    overwriteConfirmResolver = null;
+    if (resolver) resolver(Boolean(confirmed));
 }
 
 function clearConnectorGeneratorError() {
@@ -442,54 +926,232 @@ function clearConnectorGeneratorError() {
     errorEl.classList.add('hidden');
 }
 
+document.addEventListener('input', event => {
+    const modal = document.getElementById('connectorGeneratorModal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    if (modal.contains(event.target)) updateConnectorGeneratorActionButtons();
+});
+
+document.addEventListener('change', event => {
+    const modal = document.getElementById('connectorGeneratorModal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    if (modal.contains(event.target)) updateConnectorGeneratorActionButtons();
+});
+
+function showConnectorToast(message, type = 'error') {
+    const container = document.getElementById('connectorToastContainer');
+    if (!container || !message) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + type;
+    toast.setAttribute('role', 'alert');
+    toast.textContent = String(message);
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    const dismiss = () => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 180);
+    };
+    setTimeout(dismiss, 4200);
+}
+
 async function submitConnectorGenerator() {
+    const submission = collectConnectorGeneratorSubmission({ requireRepoRoot: true });
+    if (!submission) return;
+    const { requestPayload, iconFile } = submission;
+
+    const generateBtn = document.getElementById('connectorGenerateBtn');
+    clearConnectorGeneratorError();
+    showPageLoader('Generating connector...');
+    if (generateBtn) generateBtn.disabled = true;
+
+    try {
+        const postGenerate = async (payload) => {
+            const data = new FormData();
+            data.append('request', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+            data.append('icon', iconFile);
+            const response = await fetch(`${API_BASE}/generator/generate`, {
+                method: 'POST',
+                body: data
+            });
+            let errorMessage = '';
+            if (!response.ok) {
+                errorMessage = `Generation failed (${response.status})`;
+                try {
+                    const errPayload = await response.json();
+                    if (errPayload && Array.isArray(errPayload.errors) && errPayload.errors.length > 0) {
+                        errorMessage = errPayload.errors.join(' ');
+                    } else if (errPayload && errPayload.message) {
+                        errorMessage = errPayload.message;
+                    }
+                } catch (e) {
+                    errorMessage = `Generation failed (${response.status})`;
+                }
+                return { ok: false, errorMessage };
+            }
+            const body = await response.json();
+            return { ok: true, body };
+        };
+
+        let result = await postGenerate(requestPayload);
+        if (!result.ok && result.errorMessage.includes('Target folder already exists:')) {
+            hidePageLoader();
+            const confirmed = await showOverwriteConfirmDialog(
+                result.errorMessage + '\n\nDo you want to delete the existing module and regenerate it?'
+            );
+            if (confirmed) {
+                showPageLoader('Generating connector...');
+                requestPayload.overwriteExistingModule = true;
+                result = await postGenerate(requestPayload);
+            } else {
+                showConnectorGeneratorError(
+                    'Generation cancelled. Existing module was not modified. Confirm overwrite to replace it.'
+                );
+                return;
+            }
+        }
+
+        if (!result.ok) {
+            showConnectorGeneratorError(result.errorMessage || 'Connector generation failed.');
+            return;
+        }
+
+        const payload = result.body;
+        const resultContent = document.getElementById('resultContent');
+        if (resultContent) {
+            resultContent.textContent = JSON.stringify(payload, null, 2);
+            resultContent.className = 'result-content';
+            // For Create New Connector flow, allow response copy but keep cURL disabled.
+            lastResponseData = payload;
+            lastRequestParams = null;
+            updateResultButtons();
+        }
+        closeConnectorGeneratorModal();
+    } catch (error) {
+        showConnectorGeneratorError(error.message || 'Connector generation failed.');
+    } finally {
+        if (generateBtn) generateBtn.disabled = false;
+        hidePageLoader();
+    }
+}
+
+function collectConnectorGeneratorSubmission(options = {}) {
+    const requireRepoRoot = options.requireRepoRoot !== false;
     const nameInput = document.getElementById('connectorNameInput');
     const iconInput = document.getElementById('connectorIconInput');
-    const generateBtn = document.getElementById('connectorGenerateBtn');
+    const repoRootInput = document.getElementById('repoRootInput');
 
     const connectorName = nameInput ? nameInput.value.trim() : '';
+    const repoRoot = repoRootInput ? repoRootInput.value.trim() : '';
     const selectedKinds = getSelectedConnectorObjects();
+    const protocolSelected = (document.getElementById('manifestProtocolInput')?.value || '').trim();
+    const protocolOther = (document.getElementById('manifestProtocolOtherInput')?.value || '').trim();
+    const manifestProtocol = protocolSelected === 'Other' ? protocolOther : protocolSelected;
 
     if (!connectorName) {
         showConnectorGeneratorError('Connector Name is required.');
+        return;
+    }
+    if (requireRepoRoot && !repoRoot) {
+        showConnectorGeneratorError('Repository Root (repoRoot) is required.');
         return;
     }
     if (selectedKinds.length === 0) {
         showConnectorGeneratorError('Please select at least one Connector Object.');
         return;
     }
+    if (!manifestProtocol) {
+        showConnectorGeneratorError('Protocol is required.');
+        return;
+    }
 
     const iconFile = iconInput && iconInput.files ? iconInput.files[0] : null;
-    if (iconFile) {
-        if (iconFile.type !== 'image/png') {
-            showConnectorGeneratorError('Connector Icon must be a PNG file.');
-            return;
+    if (!iconFile) {
+        showConnectorGeneratorError('Connector Icon is required.');
+        return;
+    }
+    const allowed =
+        iconFile.type === 'image/png' ||
+        iconFile.type === 'image/jpeg' ||
+        iconFile.type === 'image/svg+xml' ||
+        (iconFile.name && /\.(png|jpe?g|svg)$/i.test(iconFile.name));
+    if (!allowed) {
+        showConnectorGeneratorError('Connector Icon must be PNG, JPG/JPEG, or SVG.');
+        return;
+    }
+    if (iconFile.size > 200 * 1024) {
+        showConnectorGeneratorError('Connector Icon size must be less than 200 KB.');
+        return;
+    }
+
+    const references = Array.from(document.querySelectorAll('.reference-card')).map(card => ({
+        type: (card.querySelector('.ref-type')?.value || '').trim(),
+        title: (card.querySelector('.ref-title')?.value || '').trim(),
+        url: (card.querySelector('.ref-url')?.value || '').trim(),
+        text: (card.querySelector('.ref-text')?.value || '').trim()
+    })).filter(r => r.type || r.title || r.url || r.text);
+
+    for (const r of references) {
+        if (!r.type) {
+            showConnectorGeneratorError('Each reference requires a type.');
+            return null;
         }
-        if (iconFile.size > 200 * 1024) {
-            showConnectorGeneratorError('Connector Icon size must be less than 200 KB.');
-            return;
+        if (!r.url && !r.text) {
+            showConnectorGeneratorError('Each reference must contain URL or text.');
+            return null;
         }
     }
 
+    const requestPayload = {
+        connectorName,
+        repoRoot,
+        overwriteExistingModule: false,
+        objectKinds: selectedKinds,
+        manifest: {
+            connectorMaster: {
+                oeDocs: '',
+                shortDescription: connectorName + ' connector',
+                protocol: manifestProtocol,
+                oeConnCategory: 'Application Connectors',
+                srcConnCategory: '',
+                usageCostModel: 'Usage Based',
+                active: true,
+                crawling: !!document.getElementById('cmCrawlingInput')?.checked,
+                querySheet: !!document.getElementById('cmQuerySheetInput')?.checked,
+                dataAccess: false,
+                autoLineage: false,
+                profiling: false,
+                dataQuality: false,
+                authenticationTypes: [],
+                credentialManagers: ['DATABASE']
+            },
+            crawlerOptions: buildCrawlerOptionsFromForm()
+        },
+        references
+    };
+    return { requestPayload, iconFile };
+}
+
+async function downloadConnectorGeneratorZip() {
+    const submission = collectConnectorGeneratorSubmission({ requireRepoRoot: false });
+    if (!submission) return;
+    const { requestPayload, iconFile } = submission;
+    const downloadBtn = document.getElementById('connectorDownloadBtn');
+
     clearConnectorGeneratorError();
-    showPageLoader('Generating connector...');
-    if (generateBtn) generateBtn.disabled = true;
+    showPageLoader('Preparing connector zip...');
+    if (downloadBtn) downloadBtn.disabled = true;
 
     try {
-        const formData = new FormData();
-        formData.append('connectorName', connectorName);
-        selectedKinds.forEach(kind => formData.append('objectKinds', kind));
-        if (iconFile) {
-            formData.append('icon', iconFile);
-        }
-
-        const response = await fetch(`${API_BASE}/generator/generate`, {
+        const data = new FormData();
+        data.append('request', new Blob([JSON.stringify(requestPayload)], { type: 'application/json' }));
+        data.append('icon', iconFile);
+        const response = await fetch(`${API_BASE}/generator/generate-download`, {
             method: 'POST',
-            body: formData
+            body: data
         });
-
         if (!response.ok) {
-            let errorMessage = `Generation failed (${response.status})`;
+            let errorMessage = `Download failed (${response.status})`;
             try {
                 const payload = await response.json();
                 if (payload && Array.isArray(payload.errors) && payload.errors.length > 0) {
@@ -498,27 +1160,27 @@ async function submitConnectorGenerator() {
                     errorMessage = payload.message;
                 }
             } catch (e) {
-                errorMessage = `Generation failed (${response.status})`;
+                errorMessage = `Download failed (${response.status})`;
             }
             showConnectorGeneratorError(errorMessage);
             return;
         }
 
         const blob = await response.blob();
-        const filename = getFilenameFromDisposition(response.headers.get('Content-Disposition')) || 'connector.zip';
+        const disposition = response.headers.get('Content-Disposition') || response.headers.get('content-disposition');
+        const filename = getFilenameFromDisposition(disposition) || ((requestPayload.connectorName || 'connector') + '-connector.zip');
         const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
         window.URL.revokeObjectURL(url);
-        closeConnectorGeneratorModal();
     } catch (error) {
-        showConnectorGeneratorError(error.message || 'Connector generation failed.');
+        showConnectorGeneratorError(error.message || 'Download failed.');
     } finally {
-        if (generateBtn) generateBtn.disabled = false;
+        if (downloadBtn) downloadBtn.disabled = false;
         hidePageLoader();
     }
 }
@@ -626,8 +1288,13 @@ async function loadConnectors() {
             renderConnectorList();
             attachConnectorSearchListener();
         } else {
-            connectorList.innerHTML = '<p>No connectors available</p>';
-            document.getElementById('connectorListFooter').classList.add('hidden');
+            connectorList.innerHTML = '<p>No connectors available.</p>';
+            const footer = document.getElementById('connectorListFooter');
+            if (footer) {
+                footer.classList.remove('hidden');
+                footer.innerHTML = '<span class="empty-state-text">Start by creating one.</span>';
+                appendCreateConnectorFooterAction(footer);
+            }
         }
         console.log('loadConnectors: done, hiding loader');
     } catch (error) {
@@ -708,6 +1375,9 @@ function renderConnectorList() {
             ? 'No connectors match your search.'
             : (filtered.length === 1 ? '1 connector' : filtered.length + ' connectors');
         footer.appendChild(hint);
+        if (filtered.length === 0) {
+            appendCreateConnectorFooterAction(footer);
+        }
     } else if (filtered.length > CONNECTOR_LIST_INITIAL_COUNT && !connectorListShowAll) {
         const showAllLink = document.createElement('a');
         showAllLink.href = '#';
@@ -733,6 +1403,19 @@ function renderConnectorList() {
     } else {
         footer.classList.add('hidden');
     }
+}
+
+function appendCreateConnectorFooterAction(container) {
+    if (!container) return;
+    const actions = document.createElement('div');
+    actions.className = 'footer-actions';
+    const createBtn = document.createElement('button');
+    createBtn.type = 'button';
+    createBtn.className = 'inline-create-connector-btn';
+    createBtn.innerHTML = '<span aria-hidden="true">➕</span> Create New Connector';
+    createBtn.addEventListener('click', openConnectorGeneratorModal);
+    actions.appendChild(createBtn);
+    container.appendChild(actions);
 }
 
 function attachConnectorSearchListener() {
@@ -894,8 +1577,6 @@ function renderConnectionForm(attributes) {
 
 // State management for metadata operations
 let supportedObjectsData = null;
-let containersData = null;
-let objectsData = null;
 let currentMetadataActionType = null;
 
 function renderActions() {
@@ -1606,8 +2287,7 @@ function showError(message) {
 }
 
 async function copyToClipboard(text, btnId) {
-    try {
-        await navigator.clipboard.writeText(text);
+    const markCopied = () => {
         const btn = document.getElementById(btnId);
         if (btn) {
             const originalContent = btn.innerHTML;
@@ -1618,8 +2298,46 @@ async function copyToClipboard(text, btnId) {
                 btn.classList.remove('copy-success');
             }, 2000);
         }
+    };
+
+    const fallbackCopy = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        let ok = false;
+        try {
+            ok = document.execCommand('copy');
+        } catch (e) {
+            ok = false;
+        }
+        document.body.removeChild(ta);
+        return ok;
+    };
+
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            markCopied();
+            return;
+        }
+        if (fallbackCopy()) {
+            markCopied();
+            return;
+        }
+        showError('Copy failed. Please copy manually from the response panel.');
     } catch (err) {
+        if (fallbackCopy()) {
+            markCopied();
+            return;
+        }
         console.error('Failed to copy: ', err);
+        showError('Copy failed. Please copy manually from the response panel.');
     }
 }
 

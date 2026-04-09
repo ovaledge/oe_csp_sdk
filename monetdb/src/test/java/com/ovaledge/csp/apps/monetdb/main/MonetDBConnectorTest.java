@@ -41,6 +41,9 @@ class MonetDBConnectorTest {
         assertTrue(attrs.containsKey(MonetDBConstants.KEY_DATABASE));
         assertTrue(attrs.containsKey(MonetDBConstants.KEY_USERNAME));
         assertTrue(attrs.containsKey(MonetDBConstants.KEY_PASSWORD));
+        assertTrue(attrs.containsKey(MonetDBConstants.KEY_JDBC_DRIVER));
+        assertEquals(ConnectionAttribute.Type.HIDDEN, attrs.get(MonetDBConstants.KEY_JDBC_DRIVER).getType());
+        assertEquals(MonetDBConstants.JDBC_DRIVER_CLASS, attrs.get(MonetDBConstants.KEY_JDBC_DRIVER).getValue());
         assertTrue(attrs.get(MonetDBConstants.KEY_HOST).isRequired());
         assertTrue(attrs.get(MonetDBConstants.KEY_DATABASE).isRequired());
     }

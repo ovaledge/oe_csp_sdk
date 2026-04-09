@@ -29,7 +29,8 @@ import java.util.Map;
 /**
  * Metadata service for MonetDB: schemas as containers; tables, views, functions, sequences, indexes, triggers as objects.
  * Uses ConnectionConfig as-is. No Client; JDBC operations are inlined.
- * Object types use ENTITY; getObjects uses request filters (objectSubType/displayName) to distinguish.
+ * getObjects: for ENTITY, filter displayName distinguishes Tables vs Views; for FUNCTION, SEQUENCE,
+ * INDEX, TRIGGER, VIEW, routing is by entityType only.
  * entityId uses optional prefixes (func:, seq:, idx:, trg:) so getFields can dispatch without filters.
  */
 public class MonetDBMetadataService implements MetadataService {
@@ -88,12 +89,9 @@ public class MonetDBMetadataService implements MetadataService {
     @Override
     /**
      * Return the list of objects (tables, views, functions, sequences, indexes, triggers) for the given container.
-     *
-     * The request specifies containerId and entityType; this method routes to the appropriate fetch*
-     * helper depending on subtype and request filters.
-     *
-     * @param request request containing containerId, entityType, connection config and filters
-     * @return ObjectResponse with the matching objects and success flag
+     * Routing contract:
+     * - ENTITY: uses filter displayName as subtype. Views lists views; Tables/blank/other lists base tables.
+     * - Non-ENTITY kinds: displayName is ignored and routing uses entityType only.
      */
     public ObjectResponse getObjects(ObjectRequest request) {
         List<ObjectInfo> objects = new ArrayList<>();
@@ -111,39 +109,60 @@ public class MonetDBMetadataService implements MetadataService {
             ConnectionResource resource = (ConnectionResource) ConnectionPoolManager.getInstance()
                     .getOrCreateResource(config, ResourceType.JDBC);
 
-            String subType = "";
-            if (request != null && request.getFilters() != null) {
-                for (Map<String, String> filter : request.getFilters()) {
-                    if (filter == null) continue;
-                    subType = filter.get("displayName");
-                }
-            }
-
-            switch (subType) {
-                case MonetDBConstants.DISPLAY_NAME_VIEWS:
-                    fetchViewObjects(resource, containerId, entityType, objects);
-                    break;
-                case MonetDBConstants.DISPLAY_NAME_FUNCTIONS:
-                    fetchFunctionObjects(resource, containerId, entityType, objects);
-                    break;
-                case MonetDBConstants.DISPLAY_NAME_SEQUENCES:
-                    fetchSequenceObjects(resource, containerId, entityType, objects);
-                    break;
-                case MonetDBConstants.DISPLAY_NAME_INDEXES:
-                    fetchIndexObjects(resource, containerId, entityType, objects);
-                    break;
-                case MonetDBConstants.DISPLAY_NAME_TRIGGERS:
-                    fetchTriggerObjects(resource, containerId, entityType, objects);
-                    break;
-                default:
-                    fetchTableObjects(resource, containerId, entityType, objects);
-                    break;
+            if (ObjectKind.ENTITY.value().equalsIgnoreCase(entityType)) {
+                String entitySubtype = resolveDisplayNameFilter(request);
+                fetchEntityObjectsBySubtype(resource, containerId, entityType, entitySubtype, objects);
+            } else {
+                fetchObjectsByEntityKind(resource, containerId, entityType, objects);
             }
         } catch (Exception e) {
             LOG.warn("MonetDB getObjects failed: {}", e.getMessage());
             return new ObjectResponse().withChildren(objects).withSuccess(false);
         }
         return new ObjectResponse().withChildren(objects).withSuccess(true);
+    }
+
+    private static String resolveDisplayNameFilter(ObjectRequest request) {
+        if (request == null || request.getFilters() == null) {
+            return "";
+        }
+        for (Map<String, String> filter : request.getFilters()) {
+            if (filter == null) {
+                continue;
+            }
+            String value = filter.get("displayName");
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private void fetchEntityObjectsBySubtype(ConnectionResource resource, String containerId, String entityType,
+            String entitySubtype, List<ObjectInfo> objects) {
+        if (MonetDBConstants.DISPLAY_NAME_VIEWS.equalsIgnoreCase(entitySubtype)) {
+            fetchViewObjects(resource, containerId, entityType, objects);
+        } else {
+            // Tables, missing subtype, or unrecognized ENTITY label: list base tables.
+            fetchTableObjects(resource, containerId, entityType, objects);
+        }
+    }
+
+    private void fetchObjectsByEntityKind(ConnectionResource resource, String containerId, String entityType,
+            List<ObjectInfo> objects) {
+        if (ObjectKind.FUNCTION.value().equalsIgnoreCase(entityType)) {
+            fetchFunctionObjects(resource, containerId, entityType, objects);
+        } else if (ObjectKind.SEQUENCE.value().equalsIgnoreCase(entityType)) {
+            fetchSequenceObjects(resource, containerId, entityType, objects);
+        } else if (ObjectKind.INDEX.value().equalsIgnoreCase(entityType)) {
+            fetchIndexObjects(resource, containerId, entityType, objects);
+        } else if (ObjectKind.TRIGGER.value().equalsIgnoreCase(entityType)) {
+            fetchTriggerObjects(resource, containerId, entityType, objects);
+        } else if (ObjectKind.VIEW.value().equalsIgnoreCase(entityType)) {
+            fetchViewObjects(resource, containerId, entityType, objects);
+        } else {
+            LOG.debug("MonetDB getObjects: no catalog mapping for entityType={}", entityType);
+        }
     }
 
     private void fetchTableObjects(ConnectionResource resource, String containerId, String entityType, List<ObjectInfo> objects) {
