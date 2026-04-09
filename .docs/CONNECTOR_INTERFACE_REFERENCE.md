@@ -2,7 +2,7 @@
 
 Scope: `oe_csp_sdk_core` connector-facing interfaces and connector lifecycle integration with `oe_csp_sdk/csp-api`.
 
-Workflow setup, module registration, build, and run instructions are documented in **[OvalEdge Connectors Software Development Kit.md](OvalEdge%20Connectors%20Software%20Development%20Kit.md)**.
+Workflow setup, module registration, build, and run instructions are documented in [OvalEdge Connectors Software Development Kit](OvalEdge_Connectors_Software_Development_Kit.md).
 
 ### 1\. Architecture Overview: Connector SDK Contract
 
