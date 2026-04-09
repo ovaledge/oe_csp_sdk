@@ -90,7 +90,7 @@ To register and obtain a signed agreement, contact **developer@ovaledge.com**.
 
 ## Contributing
 
-Contributions from registered developers are welcome. Before raising a Pull Request, review the [Quality Guidelines](.docs/sdk/7.Development_And_Testing.md#73-code-review-standards-and-quality-gates)
+Contributions from registered developers are welcome. Before raising a Pull Request, review the [Quality Guidelines](.docs/sdk/07.Development_And_Testing.md#73-code-review-standards-and-quality-gates)
 
 ---
 

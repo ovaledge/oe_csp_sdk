@@ -23,7 +23,7 @@ You can either build a connector for your internal use (**PRIVATE**) or make it 
 - **Public connectors** can be used by all OvalEdge customers regardless of who built them.
 - **Private connectors** can be built by Partners and Customers and deployed internally.
 
-> **Note on Private → Public promotion:** If you develop a PRIVATE connector and later wish to contribute it to the OvalEdge public catalog, you may submit it for review through the standard Pull Request process. OvalEdge runs both automated checks (via GitHub Actions) and a manual review before acceptance. See [Section 9](sdk/9.Publishing_the_assembly_JAR.md) for details.
+> **Note on Private → Public promotion:** If you develop a PRIVATE connector and later wish to contribute it to the OvalEdge public catalog, you may submit it for review through the standard Pull Request process. OvalEdge runs both automated checks (via GitHub Actions) and a manual review before acceptance. See [Section 9](sdk/09.Publishing_the_assembly_JAR.md) for details.
 
 ---
 
@@ -38,15 +38,15 @@ To build an OvalEdge connector, you should have:
 
 ## Table of Contents
 
-1. [Prerequisites](sdk/1.Prerequisites.md)
-2. [OvalEdge Connectors Public Repository](sdk/2.OvalEdge_Connectors_Public_Repository.md)
-3. [Set up your IDE](sdk/3.Set_up_your_IDE.md)
-4. [Repository Structure](sdk/4.Repository_Structure.md)
-5. [What you will develop](sdk/5.What_you_will_develop.md)
-6. [Generate the new Connector Source](sdk/6.Generate_the_new_Connector_Source.md)
+1. [Prerequisites](sdk/01.Prerequisites.md)
+2. [OvalEdge Connectors Public Repository](sdk/02.OvalEdge_Connectors_Public_Repository.md)
+3. [Set up your IDE](sdk/03.Set_up_your_IDE.md)
+4. [Repository Structure](sdk/04.Repository_Structure.md)
+5. [What you will develop](sdk/05.What_you_will_develop.md)
+6. [Generate the new Connector Source](sdk/06.Generate_the_new_Connector_Source.md)
 7. [Development & Testing](sdk/7.Development_And_Testing.md)
-8. [Assemble the new connector](sdk/8.Assemble_the_new_connector.md)
-9. [Publishing the assembly JAR](sdk/9.Publishing_the_assembly_JAR.md)
+8. [Assemble the new connector](sdk/08.Assemble_the_new_connector.md)
+9. [Publishing the assembly JAR](sdk/09.Publishing_the_assembly_JAR.md)
 10. [Summary](sdk/10.Summary.md)
 
 ---
