@@ -13,7 +13,7 @@ All SDK documentation is located in the [`.docs/`](.docs/) folder:
 | Document                                                                                  | Description |
 |-------------------------------------------------------------------------------------------|---|
 | [Getting Started with the SDK](.docs/OvalEdge_Connectors_Software_Development_Kit.md) | Step-by-step guide: prerequisites, IDE setup, connector development, building, testing, and deployment |
-| [Connector Interface Reference](.docs/CONNECTOR_INTERFACE_REFERENCE.md)                   | Full API contract for `AppsConnector`, `MetadataService`, and `QueryService` |
+| [Connector Interface Reference](.docs/Connector_Interface_Reference.md)                   | Full API contract for `AppsConnector`, `MetadataService`, and `QueryService` |
 | [SDK Developer Registration & Legal](.docs/SDK_Developer_Registration.md)                 | Developer onboarding process, legal agreements by persona, security and ethical development standards, access provisioning, and compliance requirements |
 
 ---
