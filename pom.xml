@@ -55,8 +55,8 @@
       </snapshots>
     </repository>
     <repository>
-      <id>oe-jfrog-repo</id>
-      <url>https://jfrog.ovaledge.net/artifactory/oe-repo</url>
+      <id>oe-jfrog-ext-repo</id>
+      <url>https://jfrog.ovaledge.net/artifactory/oe-ext-repo</url>
       <snapshots>
         <updatePolicy>always</updatePolicy>
       </snapshots>
