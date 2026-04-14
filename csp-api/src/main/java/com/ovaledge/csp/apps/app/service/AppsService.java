@@ -1,6 +1,7 @@
 package com.ovaledge.csp.apps.app.service;
 
 import com.ovaledge.csp.v3.core.apps.model.request.ContainersRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.EdgiConnectorObjectRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.FieldsRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.ObjectRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.QueryRequest;
@@ -122,4 +123,12 @@ public interface AppsService {
      *         due to syntax, permission, or connection issues. The exception message includes available connector types.
      */
     QueryResponse executeQuery(QueryRequest request);
+
+    /**
+     * Executes EDGI object processing for a connector.
+     *
+     * @param request EDGI object request containing connection and object context
+     * @return EDGI processing response from connector
+     */
+    EdgiConnectorObjectResponse askEdgi(EdgiConnectorObjectRequest request);
 }

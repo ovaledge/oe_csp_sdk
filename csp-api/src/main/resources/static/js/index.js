@@ -1219,6 +1219,85 @@ function setButtonsState(enabled) {
             btn.style.cursor = 'pointer';
         }
     });
+    if (enabled) {
+        applyConnectionConfigGating();
+    }
+}
+
+/**
+ * True when every required connection attribute has a non-empty value.
+ * "Get Supported Objects" is exempt from this check elsewhere; this only validates completeness.
+ */
+function isConnectionConfigComplete() {
+    if (!connectorAttributes || typeof connectorAttributes !== 'object') {
+        return false;
+    }
+    const keys = Object.keys(connectorAttributes);
+    if (keys.length === 0) {
+        return true;
+    }
+    for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const attr = connectorAttributes[key];
+        if (!attr || !attr.required) {
+            continue;
+        }
+        if (attr.type === 'HIDDEN') {
+            continue;
+        }
+        if (isHiddenByDefaultAttr(key)) {
+            continue;
+        }
+        const input = document.getElementById(`attr_${key}`);
+        if (!input) {
+            continue;
+        }
+        const val = input.value != null ? String(input.value).trim() : '';
+        if (!val) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function applyConnectionConfigGating() {
+    const filled = isConnectionConfigComplete();
+    const actionsGrid = document.getElementById('actionsGrid');
+    if (actionsGrid) {
+        actionsGrid.querySelectorAll('button.action-btn').forEach(btn => {
+            const requires = btn.dataset.requiresConnection === 'true';
+            if (requires) {
+                btn.disabled = !filled;
+                btn.style.opacity = filled ? '1' : '0.6';
+                btn.style.cursor = filled ? 'pointer' : 'not-allowed';
+                btn.title = filled ? (btn.dataset.actionDescription || '') : 'Complete Connection Configuration to use this action.';
+            } else {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                btn.title = btn.dataset.actionDescription || '';
+            }
+        });
+    }
+    const metadataGrid = document.getElementById('metadataOpsGrid');
+    if (metadataGrid) {
+        metadataGrid.querySelectorAll('button.action-btn').forEach(btn => {
+            btn.disabled = !filled;
+            btn.style.opacity = filled ? '1' : '0.6';
+            btn.style.cursor = filled ? 'pointer' : 'not-allowed';
+            btn.title = filled ? '' : 'Complete Connection Configuration to use this action.';
+        });
+    }
+}
+
+function wireConnectionFormForGating() {
+    const form = document.getElementById('connectionForm');
+    if (!form || form._connectionGatingWired) {
+        return;
+    }
+    form._connectionGatingWired = true;
+    form.addEventListener('input', applyConnectionConfigGating);
+    form.addEventListener('change', applyConnectionConfigGating);
 }
 
 
@@ -1466,6 +1545,8 @@ async function selectConnector(serverType) {
         connectorAttributes = data.attributes;
         renderConnectionForm(data.attributes);
         renderActions();
+        wireConnectionFormForGating();
+        applyConnectionConfigGating();
 
         document.getElementById('configPlaceholder').classList.add('hidden');
         document.getElementById('configSection').classList.remove('hidden');
@@ -1613,9 +1694,13 @@ function renderActions() {
         btn.className = 'action-btn';
         btn.textContent = action.name;
         btn.title = action.description || '';
+        btn.dataset.actionDescription = action.description || '';
+        const exempt = action.name === 'Get Supported Objects';
+        btn.dataset.requiresConnection = exempt ? 'false' : 'true';
         btn.onclick = () => executeAction(action);
         actionsGrid.appendChild(btn);
     });
+    applyConnectionConfigGating();
 }
 
 function getConnectionConfig() {
@@ -1673,6 +1758,11 @@ function showMetadataInputModal(type) {
         addModalInputWithAction('fields', 'Fields (comma separated, e.g., Id, Name)', false, fetchFieldsForModal);
         addModalInput('limit', 'Limit (e.g., 100)', false, 'number');
         addModalInput('offset', 'Offset (e.g., 0)', false, 'number');
+    } else if (type === 'askEdgi') {
+        modalTitle.textContent = 'Ask Edgi Parameters';
+        addModalInputWithAction('containerId', 'Container Name', true, fetchContainersForModal);
+        addModalInputWithAction('entityId', 'Object Name', true, fetchObjectsForModal);
+        addModalInputWithAction('objectFieldNames', 'Object Field Names (comma separated)', false, fetchFieldsForModal);
     }
 
     modal.classList.remove('hidden');
@@ -1795,17 +1885,15 @@ async function fetchObjectsForModal(input, btn) {
     const entityTypeInput = document.getElementById('modal_input_entityType');
     const containerIdInput = document.getElementById('modal_input_containerId');
 
-    const entityType = entityTypeInput ? entityTypeInput.value : '';
+    const entityType = entityTypeInput ? entityTypeInput.value : 'entity';
     const containerId = containerIdInput ? containerIdInput.value : '';
 
-    if (!entityType || !containerId) {
-        showError('Please select Entity Type and Container ID first');
-        if (!entityType && entityTypeInput) entityTypeInput.style.borderColor = 'red';
+    if (!containerId) {
+        showError('Please select Container ID first');
         if (!containerId && containerIdInput) containerIdInput.style.borderColor = 'red';
         return;
     }
 
-    if (entityTypeInput) entityTypeInput.style.borderColor = '';
     if (containerIdInput) containerIdInput.style.borderColor = '';
 
     const originalIcon = btn.innerHTML;
@@ -1882,19 +1970,17 @@ async function fetchFieldsForModal(input, btn) {
     const containerIdInput = document.getElementById('modal_input_containerId');
     const entityIdInput = document.getElementById('modal_input_entityId');
 
-    const entityType = entityTypeInput ? entityTypeInput.value : '';
+    const entityType = entityTypeInput ? entityTypeInput.value : 'entity';
     const containerId = containerIdInput ? containerIdInput.value : '';
     const entityId = entityIdInput ? entityIdInput.value : '';
 
-    if (!entityType || !containerId || !entityId) {
-        showError('Please select Entity Type, Container ID, and Entity ID first');
-        if (!entityType && entityTypeInput) entityTypeInput.style.borderColor = 'red';
+    if (!containerId || !entityId) {
+        showError('Please select Container ID and Entity ID first');
         if (!containerId && containerIdInput) containerIdInput.style.borderColor = 'red';
         if (!entityId && entityIdInput) entityIdInput.style.borderColor = 'red';
         return;
     }
 
-    if (entityTypeInput) entityTypeInput.style.borderColor = '';
     if (containerIdInput) containerIdInput.style.borderColor = '';
     if (entityIdInput) entityIdInput.style.borderColor = '';
 
@@ -2103,6 +2189,14 @@ async function submitMetadataModal() {
             isQuery: true,
             queryParams: params
         };
+    } else if (currentMetadataActionType === 'askEdgi') {
+        action = {
+            name: 'Ask Edgi',
+            endpoint: '/edgi/ask',
+            method: 'POST',
+            isEdgiAsk: true,
+            edgiParams: params
+        };
     }
 
     executeAction(action);
@@ -2136,6 +2230,17 @@ async function executeAction(action) {
                 offset: action.queryParams.offset ? parseInt(action.queryParams.offset) : null
             };
             body = JSON.stringify(queryRequest);
+        } else if (action.isEdgiAsk) {
+            const generatedWorkspaceId = Math.floor(100000 + (Math.random() * 900000));
+            const edgiRequest = {
+                fullyQualifiedObjectName: `${action.edgiParams.containerId}.${action.edgiParams.entityId}`,
+                workspaceId: generatedWorkspaceId,
+                objectFieldNames: action.edgiParams.objectFieldNames
+                    ? action.edgiParams.objectFieldNames.split(',').map(f => f.trim()).filter(Boolean)
+                    : [],
+                connectionConfig: config
+            };
+            body = JSON.stringify(edgiRequest);
         }
 
         const response = await fetch(url, {
@@ -2243,6 +2348,7 @@ async function checkOAuthCallback() {
                     const input = document.getElementById(`attr_${key}`);
                     if (input) input.value = val;
                 });
+                applyConnectionConfigGating();
 
                 const resultContent = document.getElementById('resultContent');
                 resultContent.innerHTML = `

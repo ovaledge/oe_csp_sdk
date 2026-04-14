@@ -1,6 +1,7 @@
 package com.ovaledge.csp.apps.app.service;
 
 import com.ovaledge.csp.v3.core.apps.model.request.ContainersRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.EdgiConnectorObjectRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.FieldsRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.ObjectRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.QueryRequest;
@@ -111,6 +112,20 @@ public class AppsServiceImpl implements AppsService {
         } catch (Exception e) {
             logger.error("Failed to execute query: {}", e.getMessage(), e);
             throw new RuntimeException("Query execution failed", e);
+        }
+    }
+
+    @Override
+    public EdgiConnectorObjectResponse askEdgi(EdgiConnectorObjectRequest request) {
+        try {
+            if (request == null || request.getConnInfo() == null || request.getConnInfo().toConnectionConfig() == null) {
+                throw new RuntimeException("ConnInfo is required to process askEdgi request");
+            }
+            AppsConnector connector = getConnector(request.getConnInfo().toConnectionConfig().getServerType());
+            return connector.processAppObjectsForEdgi(request);
+        } catch (Exception e) {
+            logger.error("Failed to process askEdgi request: {}", e.getMessage(), e);
+            throw new RuntimeException("askEdgi execution failed", e);
         }
     }
 }
