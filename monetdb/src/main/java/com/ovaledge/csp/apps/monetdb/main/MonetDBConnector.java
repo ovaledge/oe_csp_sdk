@@ -327,13 +327,32 @@ public class MonetDBConnector extends BaseAppConnector implements AppsConnector 
     @Override
     public EdgiConnectorObjectResponse processAppObjectsForEdgi(EdgiConnectorObjectRequest request) {
         EdgiConnectorObjectResponse response = new EdgiConnectorObjectResponse();
-        String entityName = request.getFullyQualifiedObjectName().split("\\.")[1];
+        String fqn = request.getFullyQualifiedObjectName();
+        if (StringUtils.isBlank(fqn) || !fqn.contains(".")) {
+            response.setObjectProcessed(false);
+            response.setEdgiProcessingMessage(
+                    "fullyQualifiedObjectName must be ContainerName.ObjectName (e.g. sys.sample_strings).");
+            return response;
+        }
+        String trimmed = fqn.trim();
+        int firstDot = trimmed.indexOf('.');
+        String containerId = trimmed.substring(0, firstDot);
+        String entityId = trimmed.substring(firstDot + 1);
+        if (StringUtils.isBlank(containerId) || StringUtils.isBlank(entityId)) {
+            response.setObjectProcessed(false);
+            response.setEdgiProcessingMessage(
+                    "fullyQualifiedObjectName must be ContainerName.ObjectName (e.g. sys.sample_strings).");
+            return response;
+        }
+        /* Parquet / audit filenames use the object (table) id; MonetDBQueryService needs schema + table. */
+        String entityName = entityId;
         int workspaceId = request.getWorkspaceId();
         ConnInfo connInfo = request.getConnInfo();
 
         try {
             QueryRequest queryRequest = new QueryRequest();
-            queryRequest.setEntityId(entityName);
+            queryRequest.setContainerId(containerId);
+            queryRequest.setEntityId(entityId);
             queryRequest.setEntityType(ObjectKind.ENTITY.value());
             queryRequest.setConnectionConfig(connInfo.toConnectionConfig());
             if (request.getObjectFieldNames() != null && !request.getObjectFieldNames().isEmpty()) {

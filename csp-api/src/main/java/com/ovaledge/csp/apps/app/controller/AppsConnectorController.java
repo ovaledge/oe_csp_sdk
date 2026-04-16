@@ -2,7 +2,9 @@ package com.ovaledge.csp.apps.app.controller;
 
 import com.ovaledge.csp.apps.app.service.AppsService;
 import com.ovaledge.csp.apps.app.service.AppsRegistry;
+import com.ovaledge.csp.dto.model.ConnInfo;
 import com.ovaledge.csp.v3.core.apps.model.request.ContainersRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.EdgiConnectorObjectRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.FieldsRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.ObjectRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.QueryRequest;
@@ -284,6 +286,76 @@ public class AppsConnectorController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
             }
         };
+    }
+
+    @PostMapping("/edgi/ask")
+    public Callable<ResponseEntity<EdgiConnectorObjectResponse>> askEdgi(@RequestBody AskEdgiRequest request) {
+        return () -> {
+            if (request == null || request.getConnectionConfig() == null || request.getFullyQualifiedObjectName() == null
+                    || request.getFullyQualifiedObjectName().isBlank()) {
+                EdgiConnectorObjectResponse errorResponse = new EdgiConnectorObjectResponse();
+                errorResponse.setObjectProcessed(false);
+                errorResponse.setEdgiProcessingMessage("Request body with fullyQualifiedObjectName and valid connectionConfig is required.");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            }
+            EdgiConnectorObjectRequest edgiRequest = new EdgiConnectorObjectRequest();
+            edgiRequest.setFullyQualifiedObjectName(request.getFullyQualifiedObjectName());
+            edgiRequest.setWorkspaceId(request.getWorkspaceId());
+            edgiRequest.setObjectFieldNames(request.getObjectFieldNames());
+            edgiRequest.setConnInfo(ConnInfo.fromConnectionConfig(request.getConnectionConfig()));
+
+            logger.info("Processing askEdgi for server type: {}",
+                request.getConnectionConfig().getServerType());
+            try {
+                EdgiConnectorObjectResponse response = appsService.askEdgi(edgiRequest);
+                return ResponseEntity.ok(response);
+            } catch (Exception e) {
+                logger.error("Error processing askEdgi request", e);
+                EdgiConnectorObjectResponse errorResponse = new EdgiConnectorObjectResponse();
+                errorResponse.setObjectProcessed(false);
+                errorResponse.setEdgiProcessingMessage("askEdgi execution failed: " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            }
+        };
+    }
+
+    public static class AskEdgiRequest {
+        private String fullyQualifiedObjectName;
+        private Integer workspaceId;
+        private List<String> objectFieldNames;
+        private ConnectionConfig connectionConfig;
+
+        public String getFullyQualifiedObjectName() {
+            return fullyQualifiedObjectName;
+        }
+
+        public void setFullyQualifiedObjectName(String fullyQualifiedObjectName) {
+            this.fullyQualifiedObjectName = fullyQualifiedObjectName;
+        }
+
+        public Integer getWorkspaceId() {
+            return workspaceId;
+        }
+
+        public void setWorkspaceId(Integer workspaceId) {
+            this.workspaceId = workspaceId;
+        }
+
+        public List<String> getObjectFieldNames() {
+            return objectFieldNames;
+        }
+
+        public void setObjectFieldNames(List<String> objectFieldNames) {
+            this.objectFieldNames = objectFieldNames;
+        }
+
+        public ConnectionConfig getConnectionConfig() {
+            return connectionConfig;
+        }
+
+        public void setConnectionConfig(ConnectionConfig connectionConfig) {
+            this.connectionConfig = connectionConfig;
+        }
     }
     
     // Info endpoint
