@@ -1,0 +1,102 @@
+{
+  "connectorMaster" : {
+    "server" : "zohodesk",
+    "displayName" : "Zohodesk",
+    "tooltip" : "Zohodesk",
+    "oeDocs" : "",
+    "shortDescription" : "Zohodesk connector",
+    "active" : true,
+    "connTypeId" : 0,
+    "connType" : 20,
+    "imgSource" : "img/db/zohodesk",
+    "dialect" : null,
+    "protocol" : "REST",
+    "dtoRegisterName" : "com.ovaledge.csp.apps.zohodesk.main.ZohodeskConnector",
+    "accessDtoRegisterName" : null,
+    "driver" : null,
+    "oeConnCategory" : "Application Connectors",
+    "srcConnCategory" : "",
+    "conncategory" : null,
+    "artifactsPackage" : "Standard",
+    "version" : null,
+    "isBaseConnector" : false,
+    "crawling" : true,
+    "deltaCrawling" : false,
+    "queryLogsCrawling" : false,
+    "profiling" : false,
+    "deltaProfiling" : false,
+    "sampleProfiling" : false,
+    "conditionalProfiling" : false,
+    "querySheet" : false,
+    "queryPolicies" : false,
+    "querySheetAppPermissions" : false,
+    "querySheetSourcePermissions" : false,
+    "anomalyDetection" : false,
+    "dataAccess" : false,
+    "dataAccessRemoteMaster" : false,
+    "dataAccessOvaledgeMaster" : false,
+    "autoLineage" : false,
+    "dataQuality" : false,
+    "bridge" : false,
+    "proxy" : false,
+    "dnsField" : null,
+    "dataAtRestSecurity" : true,
+    "dataInTransitSecurity" : true,
+    "connectionPooling" : true,
+    "queryTimeout" : false,
+    "sourceSystemMetrics" : false,
+    "authenticationTypes" : [ ],
+    "credentialManagers" : [ "DATABASE" ],
+    "usageCostModel" : "Usage Based"
+  },
+  "crawlerSettings" : {
+    "name" : "Zohodesk",
+    "server" : "zohodesk",
+    "connType" : 0,
+    "tableviewncols" : true,
+    "relationship" : false,
+    "procnfunc" : false,
+    "reports" : false,
+    "reportcolumns" : false,
+    "querypermissionmode" : false,
+    "indexes" : false,
+    "settings" : true,
+    "buildlineage" : false,
+    "usernotification" : true,
+    "contexturl" : true,
+    "rdam" : false,
+    "rbac" : false,
+    "ubac" : false,
+    "rpe" : false,
+    "upe" : false,
+    "uhp" : false,
+    "une" : false,
+    "rne" : false,
+    "unemail" : false,
+    "remotepolicy" : false,
+    "fullcrawl" : true,
+    "incrementalcrawl" : false,
+    "profiletablesandcols" : false,
+    "profileviewsandcols" : false
+  },
+  "crawlerOptions" : [ {
+    "optionType" : "CRAWLER_OPTIONS",
+    "optionKey" : "TVC"
+  }, {
+    "optionType" : "CRAWLER_OPTIONS",
+    "optionKey" : "R"
+  }, {
+    "optionType" : "CRAWL_TYPES",
+    "optionKey" : "FC"
+  }, {
+    "optionType" : "CRAWLER_PREFERENCE",
+    "optionKey" : "C"
+  }, {
+    "optionType" : "CRAWLER_PREFERENCE",
+    "optionKey" : "S"
+  } ],
+  "credentialManagerMappings" : [ "DATABASE" ],
+  "icons" : {
+    "icon" : "icons/zohodesk.png"
+  }
+}
