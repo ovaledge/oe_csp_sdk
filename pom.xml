@@ -13,6 +13,7 @@
     <module>monetdb</module>
     <module>awsconsole</module>
 
+    <module>zohodesk</module>
 <!-- Connector generator marker (modules): DO NOT REMOVE. New connector modules are inserted above this line. -->
   </modules>
   <properties>
@@ -81,6 +82,11 @@
         <version>${project.version}</version>
       </dependency>
 
+      <dependency>
+        <groupId>com.ovaledge</groupId>
+        <artifactId>zohodesk</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 <!-- Connector generator marker (dependencies): DO NOT REMOVE. New connector dependencies are inserted above this line. -->
 
       <!-- Spring Boot -->

@@ -31,6 +31,10 @@
             <artifactId>awsconsole</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.ovaledge</groupId>
+            <artifactId>zohodesk</artifactId>
+        </dependency>
 <!-- Connector generator marker (dependencies): DO NOT REMOVE. New connector dependencies are inserted above this line. -->
 
         <!-- Test dependencies for git test -->
