@@ -44,7 +44,7 @@ To build an OvalEdge connector, you should have:
 4. [Repository Structure](sdk/04.Repository_Structure.md)
 5. [What you will develop](sdk/05.What_you_will_develop.md)
 6. [Generate the new Connector Source](sdk/06.Generate_the_new_Connector_Source.md)
-7. [Development & Testing](sdk/7.Development_And_Testing.md)
+7. [Development & Testing](sdk/07.Development_And_Testing.md)
 8. [Assemble the new connector](sdk/08.Assemble_the_new_connector.md)
 9. [Publishing the assembly JAR](sdk/09.Publishing_the_assembly_JAR.md)
 10. [Summary](sdk/10.Summary.md)
