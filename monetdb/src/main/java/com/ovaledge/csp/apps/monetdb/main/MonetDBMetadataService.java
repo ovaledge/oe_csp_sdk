@@ -51,7 +51,6 @@ public class MonetDBMetadataService implements MetadataService {
                 .withSuccess(true);
     }
 
-    @Override
     /**
      * Return the list of containers (schemas) available in the target MonetDB instance.
      *
@@ -61,6 +60,7 @@ public class MonetDBMetadataService implements MetadataService {
      * @param request request containing connection config and optional filters
      * @return ContainersResponse with the list of containers and success flag
      */
+    @Override
     public ContainersResponse getContainers(ContainersRequest request) {
         List<ObjectInfo> containers = new ArrayList<>();
         ConnectionConfig config = request.getConnectionConfig();
@@ -86,13 +86,13 @@ public class MonetDBMetadataService implements MetadataService {
         return new ContainersResponse().withContainers(containers).withSuccess(true);
     }
 
-    @Override
     /**
      * Return the list of objects (tables, views, functions, sequences, indexes, triggers) for the given container.
      * Routing contract:
      * - ENTITY: uses filter displayName as subtype. Views lists views; Tables/blank/other lists base tables.
      * - Non-ENTITY kinds: displayName is ignored and routing uses entityType only.
      */
+    @Override
     public ObjectResponse getObjects(ObjectRequest request) {
         List<ObjectInfo> objects = new ArrayList<>();
         String containerId = request.getContainerId();
@@ -264,7 +264,6 @@ public class MonetDBMetadataService implements MetadataService {
         }
     }
 
-    @Override
     /**
      * Return the fields/columns metadata for the requested object (table/view/function/sequence/index/trigger).
      *
@@ -274,6 +273,7 @@ public class MonetDBMetadataService implements MetadataService {
      * @param request request containing containerId, entityId, entityType and connection config
      * @return FieldsResponse with a list of FieldInfo and success flag
      */
+    @Override
     public FieldsResponse getFields(FieldsRequest request) {
         List<FieldInfo> fields = new ArrayList<>();
         String containerId = request.getContainerId();
