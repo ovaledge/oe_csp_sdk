@@ -27,7 +27,6 @@ public class MonetDBQueryService implements QueryService {
 
     private static final RowMapper<Long> COUNT_ROW_MAPPER = (ResultSet rs, int rowNum) -> rs.getLong(1);
 
-    @Override
     /**
      * Execute a fetch request for the specified table/view (entity).
      *
@@ -41,6 +40,7 @@ public class MonetDBQueryService implements QueryService {
      * @return QueryResponse containing the result rows and totalRows
      * @throws Exception any JDBC or connection error bubbling up
      */
+    @Override
     public QueryResponse fetchData(QueryRequest request) throws Exception {
         String containerId = request.getContainerId();
         String entityId = request.getEntityId();

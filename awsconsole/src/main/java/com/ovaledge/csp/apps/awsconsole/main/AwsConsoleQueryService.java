@@ -22,7 +22,6 @@ public class AwsConsoleQueryService implements QueryService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AwsConsoleQueryService.class);
 
-    @Override
     /**
      * Fetch runtime data for the specified entity type.
      *
@@ -34,6 +33,7 @@ public class AwsConsoleQueryService implements QueryService {
      * @return QueryResponse with data list, totalRows and success flag
      * @throws Exception on client or connectivity errors
      */
+    @Override
     public QueryResponse fetchData(QueryRequest request) throws Exception {
         String containerId = request.getContainerId();
         String entityId = request.getEntityId();

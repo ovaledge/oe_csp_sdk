@@ -42,7 +42,6 @@ public class AwsConsoleMetadataService implements MetadataService {
                 .withSuccess(true);
     }
 
-    @Override
     /**
      * Return the list of AWS containers (regions) available for the provided connection.
      *
@@ -52,6 +51,7 @@ public class AwsConsoleMetadataService implements MetadataService {
      * @param request request containing connection config and optional filters
      * @return ContainersResponse containing a list of regions and success flag
      */
+    @Override
     public ContainersResponse getContainers(ContainersRequest request) {
         List<ObjectInfo> containers = new ArrayList<>();
         ConnectionConfig config = request.getConnectionConfig();
@@ -75,7 +75,6 @@ public class AwsConsoleMetadataService implements MetadataService {
         }
     }
 
-    @Override
     /**
      * Return the list of objects for the given container and entity type.
      *
@@ -85,6 +84,7 @@ public class AwsConsoleMetadataService implements MetadataService {
      * @param request request containing containerId (region), entityType and connection config
      * @return ObjectResponse with discovered objects and success flag
      */
+    @Override
     public ObjectResponse getObjects(ObjectRequest request) {
         List<ObjectInfo> objects = new ArrayList<>();
         String containerId = request.getContainerId();
@@ -130,7 +130,6 @@ public class AwsConsoleMetadataService implements MetadataService {
         }
     }
 
-    @Override
     /**
      * Return the field/column metadata for the requested entity type.
      *
@@ -139,6 +138,7 @@ public class AwsConsoleMetadataService implements MetadataService {
      * @param request request containing entityType and optional parameters
      * @return FieldsResponse with field metadata for use in the UI/query builder
      */
+    @Override
     public FieldsResponse getFields(FieldsRequest request) {
         List<FieldInfo> fields = new ArrayList<>();
         String entityType = request.getEntityType();
