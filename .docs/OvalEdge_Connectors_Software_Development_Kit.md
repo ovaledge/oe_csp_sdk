@@ -36,6 +36,14 @@ To build an OvalEdge connector, you should have:
 
 ---
 
+## Connector documentation
+
+Each connector delivery must include **end-user connector documentation** for OvalEdge administrators and catalog users. Use the [OvalEdge Connector Documentation Template](templates/OvalEdge_Connector_Documentation_Template.md) and complete all sections that apply to your source (overview, prerequisites, authentication, connection configuration, metadata mapping, operations, limitations, and troubleshooting).
+
+Store the completed document in your connector module (for example, `docs/<connector-name>.md`) and reference it from the module `README.md`. Confirm documentation is complete as part of [Definition of Done and Success Criteria](sdk/10.Definition_of_Done_and_Success_Criteria.md).
+
+---
+
 ## Table of Contents
 
 1. [Prerequisites](sdk/01.Prerequisites.md)
@@ -47,6 +55,8 @@ To build an OvalEdge connector, you should have:
 7. [Development & Testing](sdk/07.Development_And_Testing.md)
 8. [Assemble the new connector](sdk/08.Assemble_the_new_connector.md)
 9. [Publishing the assembly JAR](sdk/09.Publishing_the_assembly_JAR.md)
-10. [Summary](sdk/10.Summary.md)
+10. [Definition of Done and Success Criteria](sdk/10.Definition_of_Done_and_Success_Criteria.md)
+11. [Summary](sdk/11.Summary.md)
+12. [SDK Troubleshooting Guide](sdk/12.SDK_Troubleshooting_Guide.md)
 
 ---
