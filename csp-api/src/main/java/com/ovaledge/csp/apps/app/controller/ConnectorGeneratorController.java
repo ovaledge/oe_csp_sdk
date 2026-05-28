@@ -4,7 +4,11 @@ import com.ovaledge.csp.apps.app.generator.ConnectorGeneratorRequest;
 import com.ovaledge.csp.apps.app.generator.ConnectorGeneratorResult;
 import com.ovaledge.csp.apps.app.generator.ConnectorGeneratorService;
 import com.ovaledge.csp.apps.app.generator.ConnectorGeneratorValidationException;
+import com.ovaledge.csp.validation.LegacyPlatformServerTypes;
+import com.ovaledge.csp.validation.ServerTypeNormalizer;
 import com.ovaledge.csp.v3.core.apps.model.ObjectKind;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,11 +44,63 @@ public class ConnectorGeneratorController {
     }
 
     /**
+     * Returns server type names blocked for new connectors: legacy txt list union in-repo SDK types.
+     *
+     * <p>Values are canonical (normalized) identifiers. The UI should compare the normalized connector
+     * artifact id from {@link com.ovaledge.csp.validation.ServerTypeNormalizer} against this set.
+     *
+     * @param repoRoot optional repository root; defaults to {@link ConnectorGeneratorService#resolveRepoRootPath(String)}
+     * @return JSON body with key {@code reservedServerTypes}
+     */
+    @GetMapping("/reserved-server-types")
+    public ResponseEntity<Map<String, Object>> getReservedServerTypes(
+            @RequestParam(value = "repoRoot", required = false) String repoRoot) {
+        Path repoRootPath = ConnectorGeneratorService.resolveRepoRootPath(repoRoot);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("reservedServerTypes", new ArrayList<>(LegacyPlatformServerTypes.blockedNamesForNewConnector(repoRootPath)));
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * Normalizes a connector name the same way as generation ({@code artifactId} / {@code serverType}).
+     *
+     * <p>Also reports exact blocks (legacy ∪ in-repo) and similar reserved types (compact/hyphen variants).
+     *
+     * @param name raw connector name from the form
+     * @param repoRoot optional repository root for reserved/similar lookup
+     * @return JSON with {@code artifactId}, {@code compact}, {@code blockedExact}, {@code similarServerTypes}
+     */
+    @GetMapping("/normalize")
+    public ResponseEntity<Map<String, Object>> normalizeConnectorName(
+            @RequestParam("name") String name,
+            @RequestParam(value = "repoRoot", required = false) String repoRoot) {
+        Path repoRootPath = ConnectorGeneratorService.resolveRepoRootPath(repoRoot);
+        String artifactId = ServerTypeNormalizer.normalize(name);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("artifactId", artifactId);
+        body.put("compact", ServerTypeNormalizer.compact(name));
+        body.put("blockedExact", LegacyPlatformServerTypes.isExactBlockedForNewConnector(name, repoRootPath));
+        body.put(
+                "blockedPackageConflict",
+                LegacyPlatformServerTypes.hasInRepoPackageConflict(name, repoRootPath));
+        body.put("blocked", LegacyPlatformServerTypes.isBlockedForNewConnector(name, repoRootPath));
+        body.put(
+                "packageConflictTypes",
+                LegacyPlatformServerTypes.inRepoPackageConflictTypes(name, repoRootPath));
+        body.put("similarServerTypes", LegacyPlatformServerTypes.similarBlockedNames(name, repoRootPath));
+        body.put(
+                "suggestedAlternate",
+                LegacyPlatformServerTypes.suggestAlternateForNewConnector(name, repoRootPath));
+        return ResponseEntity.ok(body);
+    }
+
+    /**
      * Returns object-level kinds only (for the Create Connector UI).
-     * Container-level kind (CONTAINER) is excluded — top-level in AppsConnectors hierarchy;
+     *
+     * <p>Container-level kind ({@code CONTAINER}) is excluded — top-level in AppsConnectors hierarchy;
      * only object-level kinds (tables, views, files, reports, etc.) are selectable.
      *
-     * @return list of { value, displayName, category, tooltip } for each object-level ObjectKind
+     * @return list of {@code value}, {@code displayName}, {@code category}, and {@code tooltip} per {@link ObjectKind}
      */
     @GetMapping("/object-kinds")
     public ResponseEntity<List<Map<String, String>>> getObjectKinds() {

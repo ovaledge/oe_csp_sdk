@@ -62,9 +62,26 @@
             <scope>test</scope>
         </dependency>
 
+        <!--
+          Test-scoped: parses POMs in assembly tests (e.g. CspSdkGitTest). SdkConnectorReactorScanner uses
+          maven-model from the compile classpath of the test-scoped csp-api dependency below.
+        -->
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-model</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+          Test-scoped compile dependency on csp-api so assembly tests can call SdkConnectorReactorScanner
+          and LegacyPlatformServerTypes without duplicating scanner logic. LegacyServerTypeForbiddenTest
+          delegates to the same scanner used by the Connector Generator. Build csp-api before assembly
+          (e.g. mvn -pl assembly -am) so this dependency resolves to a current csp-api jar.
+        -->
+        <dependency>
+            <groupId>com.ovaledge</groupId>
+            <artifactId>csp-api</artifactId>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -72,6 +89,22 @@
 
     <build>
         <finalName>csp-sdk-${project.version}</finalName>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+            <!--
+              Copies legacy-platform-server-types.txt from csp-api into assembly test classpath so any test
+              that reads the txt list matches production. Dynamic in-repo ownership is not copied from a file;
+              LegacyServerTypeForbiddenTest uses SdkConnectorReactorScanner from the test-scoped csp-api jar.
+            -->
+            <testResource>
+                <directory>${project.basedir}/../csp-api/src/main/resources</directory>
+                <includes>
+                    <include>legacy-platform-server-types.txt</include>
+                </includes>
+            </testResource>
+        </testResources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -87,6 +120,7 @@
                             <skipTests>false</skipTests>
                             <includes>
                                 <include>**/validation/CspSdkGitTest.java</include>
+                                <include>**/validation/LegacyServerTypeForbiddenTest.java</include>
                             </includes>
                             <excludes>
                                 <exclude>**/unit/**/*Test.java</exclude>

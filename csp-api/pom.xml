@@ -45,6 +45,17 @@
         </dependency>
 <!-- Connector generator marker (dependencies): DO NOT REMOVE. New connector dependencies are inserted above this line. -->
 
+        <!--
+          Parses the repository root pom.xml (&lt;modules&gt;) at runtime for SdkConnectorReactorScanner.
+          Used to discover in-repo SDK connector modules when building the blocked/owned serverType sets
+          (Connector Generator validation and GET /v1/generator/reserved-server-types). Not used at test scope only
+          because the scanner ships in the main csp-api artifact.
+        -->
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-model</artifactId>
+        </dependency>
+
         <!-- Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
