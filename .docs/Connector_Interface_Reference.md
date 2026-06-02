@@ -258,12 +258,5 @@ public class MyQueryService implements QueryService {
 
 ### 9\) Definition of Done for New Connectors
 
-A connector is production-ready when all are true:
-
-\- Implements all required methods in \`AppsConnector\`, \`MetadataService\`, \`QueryService\`.  
-\- Returns consistent object identity across metadata and query flows.  
-\- Preserves backward-compatible attribute keys and mapping behavior.  
-\- Handles edge cases and sanitizes all client-visible error messages.  
-\- Demonstrates thread-safe behavior under concurrent requests.  
-\- Documents connector-specific limits and unsupported features explicitly.
+See [Definition of Done and Success Criteria](sdk/10.Definition_of_Done_and_Success_Criteria.md#101-definition-of-done) for the full checklist (implementation, local verification, PR, and deployment).
 
