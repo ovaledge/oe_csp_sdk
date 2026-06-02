@@ -120,14 +120,55 @@
                         </div>
                         <div class="modal-body">
                             <div id="connectorGeneratorError" class="form-error hidden"></div>
-                            <div class="form-group">
-                                <label for="connectorNameInput">Connector Name / Data Source<span class="required">*</span></label>
-                                <input type="text" id="connectorNameInput" placeholder="MonetDB">
+                            <div class="form-group connector-name-field">
+                                <div class="connector-name-label-row">
+                                    <label for="connectorNameInput">Connector Name / Data Source<span class="required">*</span></label>
+                                    <a href="https://docs.ovaledge.com/connectors/connector-repositories"
+                                        class="connector-docs-link"
+                                        target="_blank"
+                                        rel="noopener noreferrer">OvalEdge Connector Repositories</a>
+                                </div>
+                                <div class="connector-name-row">
+                                    <input type="text" id="connectorNameInput" class="connector-name-input"
+                                        placeholder="e.g. My Data Source"
+                                        autocomplete="off"
+                                        aria-describedby="connectorNameResolved connectorNameHint"
+                                        title="Letters, numbers, spaces, and hyphens only (serverType / module id)">
+                                    <button type="button" id="reservedNamesBtn" class="icon-btn reserved-names-btn"
+                                        title="View reserved server types"
+                                        aria-label="View reserved server types"
+                                        aria-expanded="false"
+                                        aria-controls="reservedNamesPopover"
+                                        onclick="toggleReservedNamesPopover(event)"
+                                        disabled>
+                                        <svg class="reserved-names-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <path fill="currentColor" d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z"/>
+                                        </svg>
+                                        <span id="reservedNamesBadge" class="reserved-names-badge hidden">0</span>
+                                    </button>
+                                    <div id="reservedNamesPopover" class="reserved-names-popover hidden" role="dialog" aria-label="Reserved server types">
+                                        <div class="reserved-names-popover-header">
+                                            <span id="reservedNamesPopoverTitle">Reserved names</span>
+                                            <button type="button" class="reserved-names-close" onclick="closeReservedNamesPopover()" aria-label="Close">&times;</button>
+                                        </div>
+                                        <div class="reserved-names-search-wrap">
+                                            <input type="search" id="reservedNamesSearch" class="reserved-names-search"
+                                                placeholder="Search server types…" autocomplete="off"
+                                                oninput="filterReservedNamesList()">
+                                        </div>
+                                        <div id="reservedNamesList" class="reserved-names-list"></div>
+                                        <p id="reservedNamesEmpty" class="reserved-names-empty hidden">No matches.</p>
+                                    </div>
+                                </div>
+                                <div id="connectorNameResolved" class="connector-name-resolved hidden" aria-live="polite"></div>
+                                <div id="connectorNameHint" class="help-text connector-name-hint" aria-live="polite"></div>
                             </div>
                             <div class="form-group">
                                 <label for="repoRootInput">Repository Root (server path)<span class="required">*</span></label>
                                 <input type="text" id="repoRootInput" placeholder="/Users/you/path/to/repo">
-                                <div class="help-text">Paste an absolute path on the machine running CSP-API.</div>
+                                <div id="repoRootStatus" class="help-text repo-root-status">
+                                    Absolute path on the machine running CSP-API.
+                                </div>
                             </div>
                             <div class="form-group form-group-dropdown">
                                 <label>Connector Objects<span class="required">*</span></label>

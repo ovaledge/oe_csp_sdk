@@ -1,6 +1,8 @@
 package com.ovaledge.csp.apps.app.generator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ovaledge.csp.validation.LegacyPlatformServerTypes;
+import com.ovaledge.csp.validation.ServerTypeNormalizer;
 import com.ovaledge.csp.v3.core.apps.model.ObjectKind;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
@@ -11,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
@@ -406,12 +409,20 @@ public class ConnectorGeneratorService {
         return xml.substring(0, sectionEnd) + snippetWithTrailingNewline + xml.substring(sectionEnd);
     }
 
+    /**
+     * Validates generator input and derives artifact id, package name, and class prefix.
+     *
+     * <p>Rejects connector names on the legacy txt list or already used by an in-repo SDK module.
+     */
     private ConnectorGenerationContext validateAndNormalize(ConnectorGeneratorRequest request) {
         List<String> errors = new ArrayList<>();
         String connectorName = request != null ? request.getConnectorName() : null;
+        Path repoRootPath = resolveRepoRootPath(request != null ? request.getRepoRoot() : null);
 
         if (connectorName == null || connectorName.trim().isEmpty()) {
             errors.add("Connector Name is required.");
+        } else if (ServerTypeNormalizer.hasDisallowedCharacters(connectorName)) {
+            errors.add("Connector Name may only contain letters, numbers, spaces, and hyphens (-).");
         }
 
         List<String> objectKindInputs = request != null ? request.getObjectKinds() : List.of();
@@ -432,6 +443,10 @@ public class ConnectorGeneratorService {
         String classPrefix = buildClassPrefix(artifactId);
         if (classPrefix.isEmpty() || !Character.isLetter(classPrefix.charAt(0))) {
             errors.add("Connector Name must start with a letter for a valid class name.");
+        }
+
+        if (!artifactId.isEmpty() && LegacyPlatformServerTypes.isBlockedForNewConnector(artifactId, repoRootPath)) {
+            errors.add(LegacyPlatformServerTypes.generatorBlockedMessage(artifactId, repoRootPath));
         }
 
         List<ObjectKind> objectKinds = parseObjectKinds(objectKindInputs, errors);
@@ -601,14 +616,49 @@ public class ConnectorGeneratorService {
         }
     }
 
-    private String normalizeArtifactId(String connectorName) {
-        if (connectorName == null) {
-            return "";
+    /**
+     * Resolves the SDK repository root used by {@link LegacyPlatformServerTypes} and
+     * {@link SdkConnectorReactorScanner} when validating connector names.
+     *
+     * <p>When {@code repoRoot} is blank, uses {@code user.dir} if it contains a {@code pom.xml}, otherwise
+     * its parent (typical when the JVM cwd is a submodule such as {@code csp-api}). Relative paths are resolved
+     * against {@code user.dir}. Invalid paths fall back to {@code user.dir}.
+     *
+     * @param repoRoot optional path from the generator form or {@code GET /v1/generator/reserved-server-types}
+     * @return absolute normalized path to the multi-module SDK root
+     */
+    public static Path resolveRepoRootPath(String repoRoot) {
+        if (repoRoot == null || repoRoot.trim().isEmpty()) {
+            Path cwd = Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
+            if (Files.isRegularFile(cwd.resolve("pom.xml"))) {
+                return cwd;
+            }
+            Path parent = cwd.getParent();
+            if (parent != null && Files.isRegularFile(parent.resolve("pom.xml"))) {
+                return parent.normalize();
+            }
+            return cwd;
         }
-        String lower = connectorName.trim().toLowerCase(Locale.ROOT);
-        String cleaned = lower.replaceAll("[^a-z0-9\\s-]", " ");
-        String hyphenated = cleaned.trim().replaceAll("\\s+", "-").replaceAll("-+", "-");
-        return hyphenated.replaceAll("^-|-$", "");
+        try {
+            Path raw = Paths.get(repoRoot.trim());
+            if (raw.isAbsolute()) {
+                return raw.normalize();
+            }
+            Path base = Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
+            return base.resolve(raw).normalize();
+        } catch (InvalidPathException ex) {
+            return Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
+        }
+    }
+
+    /**
+     * Converts the user-facing connector name to the module artifact id and {@code serverType}.
+     *
+     * @param connectorName raw name from the generator form
+     * @return canonical artifact id (empty when input has no alphanumeric characters)
+     */
+    private String normalizeArtifactId(String connectorName) {
+        return ServerTypeNormalizer.normalize(connectorName);
     }
 
     private String buildClassPrefix(String artifactId) {
