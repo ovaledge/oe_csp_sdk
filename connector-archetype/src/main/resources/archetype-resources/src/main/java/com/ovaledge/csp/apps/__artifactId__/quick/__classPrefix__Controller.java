@@ -1,6 +1,6 @@
-package com.ovaledge.csp.apps.${artifactId}.quick;
+package com.ovaledge.csp.apps.${packageName}.quick;
 
-import com.ovaledge.csp.apps.${artifactId}.main.${classPrefix}Connector;
+import com.ovaledge.csp.apps.${packageName}.main.${classPrefix}Connector;
 import com.ovaledge.csp.v3.core.apps.model.response.SupportedObjectsResponse;
 import java.util.HashMap;
 import java.util.Map;

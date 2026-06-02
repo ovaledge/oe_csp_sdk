@@ -47,4 +47,12 @@ public class ConnectorGenerationContext {
     public List<ObjectKind> getObjectKinds() {
         return new ArrayList<>(objectKinds);
     }
+
+    /**
+     * Fully qualified class name of the generated connector.
+     * Must match archetype templates (SPI, configs JSON) and {@code dtoRegisterName} in the manifest.
+     */
+    public String getConnectorFqcn() {
+        return "com.ovaledge.csp.apps." + packageName + ".main." + classPrefix + "Connector";
+    }
 }
