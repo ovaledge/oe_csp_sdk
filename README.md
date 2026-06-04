@@ -61,6 +61,24 @@ See the full [Getting Started guide](.docs/OvalEdge_Connectors_Software_Developm
 
 ---
 
+## Cursor Agent Skills
+
+Agent skills in [`.cursor/skills/`](.cursor/skills/) guide AI-assisted connector development (strict **no-assumption** behavior where noted):
+
+| Skill | Use when |
+|-------|----------|
+| [connector-research](.cursor/skills/connector-research/SKILL.md) | Gathering product/API/auth/object-model spec before coding |
+| [build-new-connector-sdk](.cursor/skills/build-new-connector-sdk/SKILL.md) | Implementing `AppsConnector`, metadata, query, SPI, and pom wiring |
+| [unit-test-generation](.cursor/skills/unit-test-generation/SKILL.md) | Adding or expanding JUnit tests for a connector module |
+| [connector-code-review](.cursor/skills/connector-code-review/SKILL.md) | Pre-PR review against SDK contracts and Definition of Done |
+| [connector-debugging](.cursor/skills/connector-debugging/SKILL.md) | Build, discovery, validation, or metadata/query failures |
+| [implement-process-app-objects-for-edgi](.cursor/skills/implement-process-app-objects-for-edgi/SKILL.md) | EDGI bridge / `processAppObjectsForEdgi` only |
+| [grill-me](.cursor/skills/grill-me/SKILL.md) | Stress-testing a connector design before research/build |
+
+Suggested order: research → scaffold (archetype or csp-api UI) → build → tests → code review.
+
+---
+
 ## Repository Structure
 
 | Module / File | Purpose |

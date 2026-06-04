@@ -26,12 +26,12 @@ steps:
   - id: build_connector
     type: prompt
     llm: auto
-    file: @.cursor/prompts/02_BuildNewConnectorSdk.md
+    file: @.cursor/skills/build-new-connector-sdk/SKILL.md
     prompt: |
       **User inputs for this run:**
       ${{ connector_inputs }}
       ---
-      **Instructions:** From the above, derive CONNECTOR_NAME, SERVER_TYPE, and data source description only if clearly stated. If any of these are missing or ambiguous, ask the user for the missing or unclear inputs; do not assume or guess. Once you have clear inputs, apply the BuildNewConnectorSdk prompt and generate the full connector module. Use the **monetdb** module as the reference for JDBC/DBMS connectors.
+      **Instructions:** Follow the **build-new-connector-sdk** skill (No-Assumption Mode). From the above, derive CONNECTOR_NAME, SERVER_TYPE, and data source description only if clearly stated. If any of these are missing or ambiguous, ask the user for the missing or unclear inputs; do not assume or guess. Once you have clear inputs, generate the full connector module. Use **monetdb** for JDBC/DBMS and **zohodesk** for REST/OAuth2 references.
     vars:
       connector_inputs: ${{ connector_inputs }}
     pause: true
@@ -51,6 +51,8 @@ steps:
       3. **Check** parent pom.xml has <module>{connector-id}</module> and dependencyManagement entry.
       4. **Check** csp-api/pom.xml and assembly/pom.xml include the connector dependency.
       5. **Confirm** META-INF/services/com.ovaledge.csp.v3.core.apps.service.AppsConnector contains the connector FQCN.
+      6. **Confirm** `@SdkConnector(artifactId = "{connector-id}")` on the connector class and `src/main/resources/configs/{connector-id}.json` with matching server type and FQCN.
+      7. **Run** connector-code-review skill checklist; fix CRITICAL/HIGH issues.
       
       List any missing or incorrect integration steps and fix them.
     vars:
@@ -61,5 +63,6 @@ steps:
 
 # Notes:
 # - This workflow is for oe_csp_sdk Apps connectors only (not csp-lib DbDto connectors).
-# - Reference: monetdb module (MonetDBConnector, MetadataService, QueryService, MonetDBConstants, quick: MonetDBController, MonetDBQuickApplication).
-# - Optional: Add research step or link to external API docs if you have a separate research template.
+# - Skills: connector-research (before build), build-new-connector-sdk, unit-test-generation, connector-code-review, connector-debugging.
+# - Reference: monetdb (JDBC), zohodesk (REST/OAuth2).
+# - Scaffold options: .docs/sdk/06.Generate_the_new_Connector_Source.md (csp-api UI or Maven archetype).

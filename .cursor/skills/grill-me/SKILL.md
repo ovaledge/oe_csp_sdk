@@ -5,6 +5,10 @@ description: Interview the user relentlessly about a plan or design until reachi
 
 Interview the user relentlessly about every aspect of their plan until you reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one.
 
+## OvalEdge connector plans
+
+When grilling a **connector** design, resolve at minimum: exact product/edition, auth mechanism, protocol (JDBC vs REST vs SDK), `ObjectKind` map, container hierarchy, public vs private catalog, and whether EDGI is required. After decisions are settled, hand off to **connector-research** (spec) then **build-new-connector-sdk** (implementation).
+
 ## How to ask questions
 
 Use the **AskUserQuestion tool** for every question you ask. Never pose questions as plain text in your response — always use the multiple-choice popup so the user can quickly select an answer or type a custom one.
