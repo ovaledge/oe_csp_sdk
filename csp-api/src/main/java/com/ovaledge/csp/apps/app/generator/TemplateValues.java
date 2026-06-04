@@ -51,6 +51,7 @@ public class TemplateValues {
         Map<String, String> values = new HashMap<>();
         values.put("connectorName", context.getConnectorName());
         values.put("artifactId", context.getArtifactId());
+        values.put("packageName", context.getPackageName());
         values.put("classPrefix", context.getClassPrefix());
         values.put("serverType", context.getServerType());
         values.put("sdkVersion", SDK_VERSION);

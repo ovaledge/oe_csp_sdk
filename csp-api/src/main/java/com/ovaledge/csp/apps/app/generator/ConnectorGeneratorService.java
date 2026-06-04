@@ -6,14 +6,13 @@ import com.ovaledge.csp.validation.ServerTypeNormalizer;
 import com.ovaledge.csp.v3.core.apps.model.ObjectKind;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
@@ -21,21 +20,23 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.imageio.ImageIO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ConnectorGeneratorService {
+
+    private static final Logger log = LoggerFactory.getLogger(ConnectorGeneratorService.class);
 
     private static final int ICON_MAX_BYTES = 200 * 1024;
     private static final int ICON_SIZE_64 = 64;
@@ -93,6 +94,17 @@ public class ConnectorGeneratorService {
                     templateValues);
             writeTemplate(javaBase.resolve("quick/" + context.getClassPrefix() + "QuickApplication.java"),
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__artifactId__/quick/__classPrefix__QuickApplication.java",
+                    templateValues);
+
+            Path testJavaBase = moduleRoot.resolve("src/test/java/com/ovaledge/csp/apps/" + context.getPackageName());
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "ConnectorTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__ConnectorTest.java",
+                    templateValues);
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "MetadataServiceTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__MetadataServiceTest.java",
+                    templateValues);
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "QueryServiceTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__QueryServiceTest.java",
                     templateValues);
 
             Path resourcesBase = moduleRoot.resolve("src/main/resources");
@@ -229,6 +241,17 @@ public class ConnectorGeneratorService {
                     templateValues);
             writeTemplate(javaBase.resolve("quick/" + context.getClassPrefix() + "QuickApplication.java"),
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__artifactId__/quick/__classPrefix__QuickApplication.java",
+                    templateValues);
+
+            Path testJavaBase = moduleRoot.resolve("src/test/java/com/ovaledge/csp/apps/" + context.getPackageName());
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "ConnectorTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__ConnectorTest.java",
+                    templateValues);
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "MetadataServiceTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__MetadataServiceTest.java",
+                    templateValues);
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "QueryServiceTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__QueryServiceTest.java",
                     templateValues);
 
             Path resourcesBase = moduleRoot.resolve("src/main/resources");
@@ -703,8 +726,7 @@ public class ConnectorGeneratorService {
         connectorMaster.put("imgSource", "img/db/" + context.getArtifactId());
         connectorMaster.put("dialect", null);
         connectorMaster.put("protocol", cm.getProtocol());
-        connectorMaster.put("dtoRegisterName",
-                "com.ovaledge.csp.apps." + context.getArtifactId() + ".main." + context.getClassPrefix() + "Connector");
+        connectorMaster.put("dtoRegisterName", context.getConnectorFqcn());
         connectorMaster.put("accessDtoRegisterName", null);
         connectorMaster.put("driver", null);
         connectorMaster.put("oeConnCategory", cm.getOeConnCategory());
@@ -900,11 +922,22 @@ public class ConnectorGeneratorService {
         Files.writeString(path, rendered, StandardCharsets.UTF_8);
     }
 
+    private void writeTemplateIfAbsentWithInfo(Path path, String templateName, Map<String, String> values) throws IOException {
+        if (Files.exists(path)) {
+            log.info("Skipping existing generated test file: {}", path);
+            return;
+        }
+        writeTemplate(path, templateName, values);
+    }
+
     private String readTemplate(String templateName) throws IOException {
         ClassPathResource resource = new ClassPathResource(templateName);
-        try (InputStream inputStream = resource.getInputStream()) {
-            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        if (resource.exists()) {
+            try (InputStream inputStream = resource.getInputStream()) {
+                return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            }
         }
+        throw new FileNotFoundException("Template not found on classpath: " + templateName);
     }
 
     private byte[] zipDirectory(Path sourceDir) throws IOException {

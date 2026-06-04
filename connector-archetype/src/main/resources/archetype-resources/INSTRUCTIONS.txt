@@ -22,5 +22,5 @@ Add dependency to assembly/pom.xml (so the connector is packaged into the assemb
   <artifactId>${artifactId}</artifactId>
 </dependency>
 
-Generated package: com.ovaledge.csp.apps.${artifactId}
-Connector class: com.ovaledge.csp.apps.${artifactId}.main.${classPrefix}Connector
+Generated package: com.ovaledge.csp.apps.${packageName}
+Connector class: com.ovaledge.csp.apps.${packageName}.main.${classPrefix}Connector
