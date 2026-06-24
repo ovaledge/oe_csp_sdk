@@ -1,4 +1,4 @@
-package com.ovaledge.csp.apps.${artifactId}.main;
+package com.ovaledge.csp.apps.${packageName}.main;
 
 import com.ovaledge.csp.v3.core.apps.model.ObjectKind;
 import com.ovaledge.csp.v3.core.apps.model.SupportedObject;
@@ -18,7 +18,7 @@ public class ${classPrefix}MetadataService implements MetadataService {
     @Override
     public SupportedObjectsResponse getSupportedObjects() {
         List<SupportedObject> types = new ArrayList<>();
-        types.add(new SupportedObject(ObjectKind.ENTITY.value(), "Entity", "${classPrefix} entity"));
+${supportedObjectsInit}
         return new SupportedObjectsResponse()
                 .withSupportedObjects(types)
                 .withSuccess(true);

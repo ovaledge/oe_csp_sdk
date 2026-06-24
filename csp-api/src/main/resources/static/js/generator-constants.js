@@ -1,3 +1,20 @@
+function primaryObjectFamilyCodesFromKinds(upper) {
+    const codes = [];
+    if (upper.includes('ENTITY') || upper.includes('VIEW')) {
+        codes.push('TVC');
+    }
+    if (upper.includes('REPORT')) {
+        codes.push('R');
+    }
+    if (upper.includes('DATASET')) {
+        codes.push('DS');
+    }
+    if (upper.includes('FILE') || upper.includes('FILEFOLDERS')) {
+        codes.push('FF');
+    }
+    return codes;
+}
+
 window.CONNECTOR_UI_CONSTANTS = {
     API_BASE: '/v1',
     CONNECTOR_LIST_INITIAL_COUNT: 5,
@@ -11,6 +28,7 @@ window.CONNECTOR_UI_CONSTANTS = {
         { code: 'RS', name: 'Relationships', optionType: 'CRAWLER_OPTIONS', category: 'Core', description: 'Relationship support' },
         { code: 'PF', name: 'Procedures, Functions, Triggers & Views Source Code', optionType: 'CRAWLER_OPTIONS', category: 'Core', description: 'Procedures, Functions, Triggers & Views Source Code' },
         { code: 'R', name: 'Reports', optionType: 'CRAWLER_OPTIONS', category: 'Report', description: 'Reports support' },
+        { code: 'DS', name: 'Datasets', optionType: 'CRAWLER_OPTIONS', category: 'ETL', description: 'ETL datasets support' },
         { code: 'RC', name: 'Report Columns', optionType: 'CRAWLER_OPTIONS', category: 'Report', description: 'Report Columns support' },
         { code: 'QP', name: 'Permissions', optionType: 'CRAWLER_OPTIONS', category: 'Security', description: 'Permissions support' },
         { code: 'AC', name: 'Additional Crawl', optionType: 'CRAWLER_OPTIONS', category: 'Advanced', description: 'Additional crawling capabilities' },
@@ -52,6 +70,7 @@ window.CONNECTOR_UI_CONSTANTS = {
         RS: 'Captures object relationships/lineage links (for example, foreign-key style links) when the source exposes them.',
         PF: 'Extracts procedures/functions and available source definitions to improve technical metadata coverage.',
         R: 'Includes report objects in crawl results for reporting/BI style sources.',
+        DS: 'Includes ETL dataset objects (data flows, mappings, jobs) in crawl results.',
         RC: 'Includes report column-level metadata where report structures are available.',
         FF: 'Discovers file containers and file hierarchy objects (folders/buckets and file nodes).',
         AA: 'Crawls API endpoints/resources and related attributes for API-based connectors.',
@@ -68,11 +87,81 @@ window.CONNECTOR_UI_CONSTANTS = {
         BL: 'Build-lineage preference toggle; reserved for future SDK support.',
         UN: 'Controls user-notification preference behavior for crawl-related actions.'
     },
-    CONNECTOR_OBJECT_CATEGORY_ORDER: ['Database objects', 'File System Objects', 'Reporting', 'Other'],
+    CONNECTOR_OBJECT_CATEGORY_ORDER: ['Database objects', 'File System Objects', 'Reporting', 'ETL Objects', 'Other'],
     CONNECTOR_OBJECT_CATEGORY_TOOLTIPS: {
         'Database objects': 'Table-like objects, views, and database routines (functions, procedures, sequences, indexes, triggers).',
         'File System Objects': 'File system objects such as buckets/folders and files.',
         'Reporting': 'Reports from reporting or BI sources.',
+        'ETL Objects': 'ETL datasets such as data flows, mappings, and jobs.',
         'Other': 'Other object types supported by the connector.'
+    },
+    /** Maps CRAWLER_OPTIONS codes to ObjectKind values selected in Connector Objects. */
+    CONNECTOR_OBJECT_CRAWLER_OPTION_SYNC: {
+        TVC: ['ENTITY', 'VIEW'],
+        R: ['REPORT'],
+        DS: ['DATASET'],
+        FF: ['FILE', 'FILEFOLDERS']
+    },
+    PRIMARY_OBJECT_OPTIONS: [
+        {
+            code: 'TVC',
+            label: 'Tables, Views & Columns',
+            description: 'Default navigation container for table-like metadata (schemas, tables, views).'
+        },
+        {
+            code: 'R',
+            label: 'Reports',
+            description: 'Default navigation container for report and BI objects.'
+        },
+        {
+            code: 'DS',
+            label: 'Datasets',
+            description: 'Default navigation container for ETL dataset objects.'
+        },
+        {
+            code: 'FF',
+            label: 'File Folders / Buckets',
+            description: 'Default navigation container for file system hierarchy objects.'
+        }
+    ],
+    /**
+     * Returns eligible primaryObject codes based on selected ObjectKind values.
+     */
+    getEligiblePrimaryObjectCodes(kinds) {
+        const selected = Array.isArray(kinds) ? kinds : [];
+        const upper = selected.map(k => String(k || '').trim().toUpperCase());
+        return primaryObjectFamilyCodesFromKinds(upper);
+    },
+    needsPrimaryObjectSelection(kinds) {
+        const selected = Array.isArray(kinds) ? kinds : [];
+        const upper = selected.map(k => String(k || '').trim().toUpperCase());
+        return primaryObjectFamilyCodesFromKinds(upper).length >= 2;
+    },
+    /**
+     * Resolves connectorMaster.primaryObject from selected ObjectKind values.
+     * Priority when multiple kinds are selected: TVC > R > DS > FF.
+     */
+    resolvePrimaryObjectFromKinds(kinds, override) {
+        if (override != null && String(override).trim() !== '') {
+            return String(override).trim().toUpperCase();
+        }
+        const selected = Array.isArray(kinds) ? kinds : [];
+        if (selected.length === 0) {
+            return 'TVC';
+        }
+        const upper = selected.map(k => String(k || '').trim().toUpperCase());
+        if (upper.includes('ENTITY') || upper.includes('VIEW')) {
+            return 'TVC';
+        }
+        if (upper.includes('REPORT')) {
+            return 'R';
+        }
+        if (upper.includes('DATASET')) {
+            return 'DS';
+        }
+        if (upper.includes('FILE') || upper.includes('FILEFOLDERS')) {
+            return 'FF';
+        }
+        return 'TVC';
     }
 };

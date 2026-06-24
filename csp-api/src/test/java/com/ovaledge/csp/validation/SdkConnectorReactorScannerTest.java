@@ -35,12 +35,12 @@ class SdkConnectorReactorScannerTest {
         Files.createDirectories(spi.getParent());
         Files.writeString(spi, StubMismatchConnector.class.getName());
         Files.createDirectories(module.resolve("src/main/resources/configs"));
-        Files.writeString(module.resolve("src/main/resources/configs/wrong-name.json"), "{}");
+        Files.writeString(module.resolve("src/main/resources/configs/wrongname.json"), "{}");
         writeRootPom(tempDir, "badmodule");
 
         SdkConnectorReactorScanner.ScanResult scan = SdkConnectorReactorScanner.scan(tempDir);
         assertEquals(1, scan.configRuntimeMismatches().size());
-        assertTrue(scan.configRuntimeMismatches().get(0).contains("wrong-name"));
+        assertTrue(scan.configRuntimeMismatches().get(0).contains("wrongname"));
         assertTrue(scan.configRuntimeMismatches().get(0).contains("monetdb"));
     }
 

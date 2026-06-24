@@ -1,6 +1,6 @@
-package com.ovaledge.csp.apps.${artifactId}.main;
+package com.ovaledge.csp.apps.${packageName}.main;
 
-import com.ovaledge.csp.apps.${artifactId}.constants.${classPrefix}Constants;
+import com.ovaledge.csp.apps.${packageName}.constants.${classPrefix}Constants;
 import com.ovaledge.csp.dto.model.ConnInfo;
 import com.ovaledge.csp.dto.model.ConnectionAttribute;
 import com.ovaledge.csp.sdk.core.SdkCoreConstants;

@@ -1,7 +1,7 @@
 {
   "connectorMaster": {
     "server": "your_connector_key",
-    "displayName": "Your Connector",
+    "connectorName": "Your Connector",
     "tooltip": "Tooltip text",
     "oeDocs": "https://docs.ovaledge.com/connectors/...",
     "shortDescription": "Short description of the connector",
@@ -45,6 +45,7 @@
     "connectionPooling": true,
     "queryTimeout": true,
     "sourceSystemMetrics": true,
+    "primaryObject": "TVC",
     "authenticationTypes": ["UserId & Password Authentication"],
     "credentialManagers": ["DATABASE"],
     "usageCostModel": "License Based"
@@ -101,6 +102,8 @@
   "_description": "Copy this file to configs/<your_connector>.json; replace placeholders; do not deploy as-is.",
   "_fieldDescriptions": {
     "connectorMaster.server": "Unique connector key (lowercase, alphanumeric, underscore). E.g. mysql, postgres.",
+    "connectorMaster.connectorName": "Human-readable connector name shown in the OvalEdge UI.",
+    "connectorMaster.primaryObject": "Primary object code for the connector's default crawl container (e.g. TVC, R, DS, FF).",
     "connectorMaster.connType": "0=RDBMS, 1=File, 2=Report, 5=ETL, 6=API, 10=Integrations, 101=BI, 102=Ticketing",
     "connectorMaster.dtoRegisterName": "Fully qualified DTO class name; must match the class in your connector JAR",
     "connectorMaster.credentialManagers": "Array of supported credential manager codes, e.g. [\"DATABASE\"], [\"VAULT\"]",

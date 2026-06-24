@@ -108,6 +108,7 @@ public class ConnectorGeneratorRequest {
         private Boolean dataQuality;
         private List<String> authenticationTypes;
         private List<String> credentialManagers;
+        private String primaryObject;
 
         public String getOeDocs() { return oeDocs; }
         public void setOeDocs(String oeDocs) { this.oeDocs = oeDocs; }
@@ -139,18 +140,28 @@ public class ConnectorGeneratorRequest {
         public void setAuthenticationTypes(List<String> authenticationTypes) { this.authenticationTypes = authenticationTypes; }
         public List<String> getCredentialManagers() { return credentialManagers; }
         public void setCredentialManagers(List<String> credentialManagers) { this.credentialManagers = credentialManagers; }
+        public String getPrimaryObject() { return primaryObject; }
+        public void setPrimaryObject(String primaryObject) { this.primaryObject = primaryObject; }
     }
 
     public static class CrawlerSettingsInput {
+        private Boolean tableviewncols;
         private Boolean relationship;
         private Boolean procnfunc;
         private Boolean reports;
         private Boolean reportcolumns;
+        private Boolean querypermissionmode;
         private Boolean indexes;
         private Boolean settings;
         private Boolean fullcrawl;
         private Boolean incrementalcrawl;
+        private Boolean profiletablesandcols;
+        private Boolean profileviewsandcols;
+        private Boolean datasets;
+        private Boolean fileFolders;
 
+        public Boolean getTableviewncols() { return tableviewncols; }
+        public void setTableviewncols(Boolean tableviewncols) { this.tableviewncols = tableviewncols; }
         public Boolean getRelationship() { return relationship; }
         public void setRelationship(Boolean relationship) { this.relationship = relationship; }
         public Boolean getProcnfunc() { return procnfunc; }
@@ -159,6 +170,8 @@ public class ConnectorGeneratorRequest {
         public void setReports(Boolean reports) { this.reports = reports; }
         public Boolean getReportcolumns() { return reportcolumns; }
         public void setReportcolumns(Boolean reportcolumns) { this.reportcolumns = reportcolumns; }
+        public Boolean getQuerypermissionmode() { return querypermissionmode; }
+        public void setQuerypermissionmode(Boolean querypermissionmode) { this.querypermissionmode = querypermissionmode; }
         public Boolean getIndexes() { return indexes; }
         public void setIndexes(Boolean indexes) { this.indexes = indexes; }
         public Boolean getSettings() { return settings; }
@@ -167,6 +180,14 @@ public class ConnectorGeneratorRequest {
         public void setFullcrawl(Boolean fullcrawl) { this.fullcrawl = fullcrawl; }
         public Boolean getIncrementalcrawl() { return incrementalcrawl; }
         public void setIncrementalcrawl(Boolean incrementalcrawl) { this.incrementalcrawl = incrementalcrawl; }
+        public Boolean getProfiletablesandcols() { return profiletablesandcols; }
+        public void setProfiletablesandcols(Boolean profiletablesandcols) { this.profiletablesandcols = profiletablesandcols; }
+        public Boolean getProfileviewsandcols() { return profileviewsandcols; }
+        public void setProfileviewsandcols(Boolean profileviewsandcols) { this.profileviewsandcols = profileviewsandcols; }
+        public Boolean getDatasets() { return datasets; }
+        public void setDatasets(Boolean datasets) { this.datasets = datasets; }
+        public Boolean getFileFolders() { return fileFolders; }
+        public void setFileFolders(Boolean fileFolders) { this.fileFolders = fileFolders; }
     }
 
     public static class CrawlerOptionInput {

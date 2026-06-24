@@ -1,7 +1,7 @@
 {
     "connectorMaster": {
         "server": "awsconsole",
-        "displayName": "AWS Console",
+        "connectorName": "AWS Console",
         "tooltip": "AWS Console",
         "oeDocs": "https://docs.ovaledge.com/connectors/connector-repositories/cloud/aws-console",
         "shortDescription": "AWS Console connector for EC2, S3 and other AWS services via AWS SDK",
@@ -44,6 +44,7 @@
         "connectionPooling": false,
         "queryTimeout": false,
         "sourceSystemMetrics": false,
+        "primaryObject": "TVC",
         "authenticationTypes": [
             "Access Key & Secret Key"
         ],

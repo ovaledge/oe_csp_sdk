@@ -1,1 +1,1 @@
-com.ovaledge.csp.apps.${artifactId}.main.${classPrefix}Connector
+com.ovaledge.csp.apps.${packageName}.main.${classPrefix}Connector
