@@ -8,7 +8,12 @@ const {
     CRAWLER_OPTION_CATALOG,
     CRAWLER_OPTION_TOOLTIP_DETAILS,
     CONNECTOR_OBJECT_CATEGORY_ORDER,
-    CONNECTOR_OBJECT_CATEGORY_TOOLTIPS
+    CONNECTOR_OBJECT_CATEGORY_TOOLTIPS,
+    CONNECTOR_OBJECT_CRAWLER_OPTION_SYNC,
+    PRIMARY_OBJECT_OPTIONS,
+    getEligiblePrimaryObjectCodes,
+    needsPrimaryObjectSelection,
+    resolvePrimaryObjectFromKinds
 } = window.CONNECTOR_UI_CONSTANTS;
 let selectedConnector = null;
 let connectorAttributes = null;
@@ -149,7 +154,7 @@ async function fetchReservedServerTypes() {
         }
         const data = await response.json();
         const types = data && Array.isArray(data.reservedServerTypes) ? data.reservedServerTypes : [];
-        generatorReservedServerTypes = new Set(types.map(t => String(t).toLowerCase()));
+        generatorReservedServerTypes = new Set(types.map(t => String(t)));
         generatorReservedServerTypesList = [...generatorReservedServerTypes].sort();
         generatorReservedServerTypesState = 'ready';
         updateReservedNamesButton();
@@ -419,9 +424,6 @@ function getConnectorNameValidationState(connectorName) {
     if (validateConnectorNameNotReserved(trimmed)) {
         return 'blocked';
     }
-    if (findSimilarReservedServerTypes(trimmed).length > 0) {
-        return 'similar';
-    }
     const artifactId = resolveArtifactIdForConnectorName(trimmed);
     if (artifactId) {
         return 'ok';
@@ -429,67 +431,8 @@ function getConnectorNameValidationState(connectorName) {
     return 'empty';
 }
 
-function highlightSimilarConnectorCards(similarTypes) {
-    const cards = document.querySelectorAll('.connector-card');
-    const similarSet = new Set((similarTypes || []).map(t => String(t).toLowerCase()));
-    cards.forEach(card => {
-        const st = (card.dataset.serverType || '').toLowerCase();
-        card.classList.toggle('conflict-similar', similarSet.has(st));
-    });
-}
-
-function scrollToSimilarConnector(serverType) {
-    const target = String(serverType || '').toLowerCase();
-    if (!target) return;
-
-    const section = document.getElementById('selectConnectorSection');
-    if (section && section.classList.contains('collapsed')) {
-        section.classList.remove('collapsed');
-    }
-
-    const searchInput = document.getElementById('connectorSearch');
-    if (searchInput) {
-        searchInput.value = target;
-    }
-    connectorListShowAll = true;
-    renderConnectorList();
-
-    const connectorList = document.getElementById('connectorList');
-    if (!connectorList) {
-        showConnectorToast(
-            'Connector list is not visible. Close this dialog or check that connectors loaded from /v1/info.',
-            'error'
-        );
-        return;
-    }
-
-    const cards = connectorList.querySelectorAll('.connector-card');
-    for (const card of cards) {
-        if ((card.dataset.serverType || '').toLowerCase() !== target) {
-            continue;
-        }
-        const cardTop = card.offsetTop;
-        const cardHeight = card.offsetHeight;
-        const listHeight = connectorList.clientHeight;
-        connectorList.scrollTop = Math.max(0, cardTop - listHeight / 2 + cardHeight / 2);
-        card.classList.add('conflict-similar');
-        setTimeout(() => card.classList.remove('conflict-similar'), 3000);
-        setTimeout(() => card.classList.add('conflict-similar'), 3050);
-        showConnectorToast(
-            `Highlighted ${formatConnectorDisplayName(target)} in the connector list (behind this dialog).`,
-            'info'
-        );
-        return;
-    }
-
-    showConnectorToast(
-        `"${formatConnectorDisplayName(target)}" is reserved in this SDK repo but may not be loaded in /v1/info yet.`,
-        'error'
-    );
-}
-
 function packageNameFromArtifactId(artifactId) {
-    return (artifactId || '').replace(/-/g, '');
+    return artifactId || '';
 }
 
 /** Module/serverType/package from current input (normalized); caller applies chip-warn when blocked. */
@@ -505,6 +448,88 @@ function resolveConnectorNameChipIds(connectorName) {
     };
 }
 
+/** User-selected primaryObject when multiple object families are selected; null when auto-derived. */
+let primaryObjectManualSelection = null;
+
+function getPrimaryObjectFormValue() {
+    const group = document.getElementById('primaryObjectFieldGroup');
+    if (!group || group.classList.contains('hidden')) {
+        return null;
+    }
+    return primaryObjectManualSelection;
+}
+
+function formatPrimaryObjectFamilyList(labels) {
+    if (!labels || labels.length === 0) return '';
+    if (labels.length === 1) return labels[0];
+    if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+    return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`;
+}
+
+function setPrimaryObjectSelection(code, { updatePanel = true } = {}) {
+    primaryObjectManualSelection = code;
+    document.querySelectorAll('#primaryObjectOptions .protocol-toggle-btn').forEach(btn => {
+        const isActive = btn.dataset.value === code;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+    });
+    if (updatePanel) {
+        const connectorName = (document.getElementById('connectorNameInput')?.value || '').trim();
+        updateConnectorNameResolvedPanel(connectorName, getConnectorNameValidationState(connectorName));
+    }
+}
+
+function updatePrimaryObjectField() {
+    const group = document.getElementById('primaryObjectFieldGroup');
+    const container = document.getElementById('primaryObjectOptions');
+    const context = document.getElementById('primaryObjectContext');
+    if (!group || !container) return;
+
+    const selectedKinds = getSelectedConnectorObjects();
+    const eligible = getEligiblePrimaryObjectCodes(selectedKinds);
+
+    if (!needsPrimaryObjectSelection(selectedKinds)) {
+        group.classList.add('hidden');
+        container.innerHTML = '';
+        if (context) context.textContent = '';
+        primaryObjectManualSelection = null;
+        return;
+    }
+
+    group.classList.remove('hidden');
+    const defaultCode = resolvePrimaryObjectFromKinds(selectedKinds);
+    let selectedCode = primaryObjectManualSelection;
+    if (!selectedCode || !eligible.includes(selectedCode)) {
+        selectedCode = defaultCode;
+    }
+
+    const eligibleOptions = PRIMARY_OBJECT_OPTIONS.filter(option => eligible.includes(option.code));
+    if (context) {
+        const familyLabels = eligibleOptions.map(option => option.label);
+        context.textContent =
+            `You selected ${formatPrimaryObjectFamilyList(familyLabels)}. `
+            + 'Pick which family OvalEdge should use as the default crawl entry point.';
+    }
+
+    container.innerHTML = '';
+    eligibleOptions.forEach(option => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'protocol-toggle-btn';
+        btn.dataset.value = option.code;
+        btn.setAttribute('role', 'radio');
+        btn.setAttribute('aria-checked', option.code === selectedCode ? 'true' : 'false');
+        btn.title = option.description;
+        btn.innerHTML = `<span class="primary-object-code">${escapeHtml(option.code)}</span>`
+            + `<span class="primary-object-name">${escapeHtml(option.label)}</span>`;
+        btn.addEventListener('click', () => {
+            setPrimaryObjectSelection(option.code);
+        });
+        container.appendChild(btn);
+    });
+    setPrimaryObjectSelection(selectedCode, { updatePanel: false });
+}
+
 function updateConnectorNameResolvedPanel(connectorName, state) {
     const panel = document.getElementById('connectorNameResolved');
     if (!panel) return;
@@ -517,16 +542,27 @@ function updateConnectorNameResolvedPanel(connectorName, state) {
     const chipClass =
         state === 'blocked'
             ? 'chip-blocked'
-            : state === 'similar'
-              ? 'chip-warn'
-              : state === 'ok'
+            : state === 'ok'
                 ? 'chip-ok'
                 : '';
     panel.classList.remove('hidden');
+    const selectedKinds = getSelectedConnectorObjects();
+    const primaryObject = selectedKinds.length > 0
+        ? getResolvedPrimaryObject(selectedKinds)
+        : null;
+    const showPrimaryObjectChip = primaryObject && !needsPrimaryObjectSelection(selectedKinds);
     panel.innerHTML =
         `<span class="connector-resolved-chip ${chipClass}">Module <strong>${ids.module}</strong></span>`
         + `<span class="connector-resolved-chip ${chipClass}">serverType <strong>${ids.serverType}</strong></span>`
-        + `<span class="connector-resolved-chip ${chipClass}">Package <strong>${ids.packageName}</strong></span>`;
+        + `<span class="connector-resolved-chip ${chipClass}">Package <strong>${ids.packageName}</strong></span>`
+        + (showPrimaryObjectChip
+            ? `<span class="connector-resolved-chip ${chipClass}">primaryObject <strong>${escapeHtml(primaryObject)}</strong></span>`
+            : '');
+}
+
+function getResolvedPrimaryObject(selectedKinds) {
+    const kinds = Array.isArray(selectedKinds) ? selectedKinds : getSelectedConnectorObjects();
+    return resolvePrimaryObjectFromKinds(kinds, getPrimaryObjectFormValue());
 }
 
 function updateConnectorNameUx(connectorName) {
@@ -534,9 +570,7 @@ function updateConnectorNameUx(connectorName) {
     const nameInput = document.getElementById('connectorNameInput');
     const state = getConnectorNameValidationState(connectorName);
     const artifactId = resolveArtifactIdForConnectorName(connectorName);
-    const similar = findSimilarReservedServerTypes(connectorName);
 
-    highlightSimilarConnectorCards(similar);
     updateConnectorNameResolvedPanel(connectorName, state);
 
     if (nameInput) {
@@ -546,16 +580,11 @@ function updateConnectorNameUx(connectorName) {
             nameInput.title = artifactId
                 ? `Reserved or in use. Resolved id: ${artifactId}. Try ${suggestConnectorAlternate(artifactId)}.`
                 : 'Reserved or in use.';
-        } else if (state === 'similar') {
-            nameInput.classList.add('input-similar');
-            nameInput.title = similar[0]
-                ? `Similar to ${similar[0]}. Resolved id: ${artifactId || '(pending)'}.`
-                : 'Similar to an existing name.';
         } else if (state === 'ok' && artifactId) {
             nameInput.classList.add('input-valid');
             nameInput.title = `Will create module / serverType / package: ${artifactId}`;
         } else {
-            nameInput.title = 'Letters, numbers, spaces, and hyphens only (serverType / module id)';
+            nameInput.title = 'Lowercase letters and numbers only; must start with a letter (serverType / module id)';
         }
         if (artifactId && state !== 'empty' && state !== 'loading' && state !== 'repo-error') {
             nameInput.setAttribute('data-resolved-id', artifactId);
@@ -593,17 +622,6 @@ function updateConnectorNameUx(connectorName) {
         );
         return;
     }
-    if (state === 'similar') {
-        hintEl.classList.add('warning-text', 'is-similar');
-        const primary = similar[0] || artifactId;
-        setConnectorNameHintTrySuggestion(
-            hintEl,
-            `Similar to ${primary}. Resolved as ${artifactId}; try `,
-            artifactId,
-            ' if unsure.'
-        );
-        return;
-    }
     if (artifactId) {
         hintEl.classList.add('is-ok');
         hintEl.textContent = `Available. ${artifactId} is unused and not reserved.`;
@@ -633,6 +651,10 @@ function getConnectorGeneratorBlockReason() {
     if (getSelectedConnectorObjects().length === 0) {
         return 'Select at least one connector object.';
     }
+    const selectedKinds = getSelectedConnectorObjects();
+    if (needsPrimaryObjectSelection(selectedKinds) && !getPrimaryObjectFormValue()) {
+        return 'Select a primary object.';
+    }
     const protocolSelected = (document.getElementById('manifestProtocolInput')?.value || '').trim();
     const protocolOther = (document.getElementById('manifestProtocolOtherInput')?.value || '').trim();
     const protocol = protocolSelected === 'Other' ? protocolOther : protocolSelected;
@@ -646,58 +668,94 @@ function getConnectorGeneratorBlockReason() {
     return '';
 }
 
-/** Strips characters other than letters, digits, spaces, and hyphens. */
-function sanitizeConnectorNameInput(value) {
-    if (value == null) return '';
-    return String(value).replace(/[^a-zA-Z0-9\s-]/g, '');
+/** Whether a reserved name matches the proposed artifact id after normalization. */
+function matchesReservedServerType(artifactId, reserved) {
+    return normalizeConnectorArtifactId(artifactId) === normalizeConnectorArtifactId(reserved);
 }
 
-/** Mirrors ServerTypeNormalizer#normalize. */
-function normalizeConnectorArtifactId(connectorName) {
-    if (!connectorName) return '';
-    const lower = connectorName.trim().toLowerCase();
-    const cleaned = lower.replace(/[^a-z0-9\s-]/g, '');
-    const hyphenated = cleaned.trim().replace(/\s+/g, '-').replace(/-+/g, '-');
-    return hyphenated.replace(/^-|-$/g, '');
-}
-
-/** Mirrors ServerTypeNormalizer#compact (Java package). */
-function compactConnectorArtifactId(connectorName) {
-    return normalizeConnectorArtifactId(connectorName).replace(/-/g, '');
-}
-
-const CONNECTOR_VERSION_SUFFIX_RE = /^(.+)-v(\d+)$/;
-
-function stripConnectorVersionSuffix(artifactId) {
-    const id = (artifactId || '').trim();
-    const match = id.match(CONNECTOR_VERSION_SUFFIX_RE);
-    return match ? match[1] : id;
-}
-
-function isConnectorArtifactIdTaken(candidate, blocked) {
-    if (!blocked || blocked.size === 0) {
+function isExactReservedServerType(artifactId) {
+    if (!artifactId || !generatorReservedServerTypes || generatorReservedServerTypes.size === 0) {
         return false;
     }
-    if (blocked.has(candidate)) {
-        return true;
-    }
-    const compactCandidate = packageNameFromArtifactId(candidate);
-    for (const reserved of blocked) {
-        if (packageNameFromArtifactId(reserved) === compactCandidate) {
+    for (const reserved of generatorReservedServerTypes) {
+        if (matchesReservedServerType(artifactId, reserved)) {
             return true;
         }
     }
     return false;
 }
 
-function nextConnectorSuggestedVersion(stem, blocked) {
+/** Strips characters other than lowercase letters and digits. */
+function sanitizeConnectorNameInput(value) {
+    if (value == null) return '';
+    return String(value).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** Mirrors ServerTypeNormalizer#normalize. */
+function normalizeConnectorArtifactId(connectorName) {
+    if (!connectorName) return '';
+    return connectorName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** Normalized legacy ∪ in-repo blocked names for version-suffix and alternate suggestions. */
+function normalizedBlockedServerTypes() {
+    if (!generatorReservedServerTypes || generatorReservedServerTypes.size === 0) {
+        return new Set();
+    }
+    const blocked = new Set();
+    for (const reserved of generatorReservedServerTypes) {
+        const normalized = normalizeConnectorArtifactId(reserved);
+        if (normalized) {
+            blocked.add(normalized);
+        }
+    }
+    return blocked;
+}
+
+/** Mirrors ServerTypeNormalizer#toPascalCase. */
+function toConnectorPascalCase(artifactId) {
+    if (!artifactId) return '';
+    return artifactId.charAt(0).toUpperCase() + artifactId.slice(1);
+}
+
+const CONNECTOR_VERSION_SUFFIX_RE = /^(.+)v(\d+)$/;
+
+function stripConnectorVersionSuffix(artifactId, blockedNormalized) {
+    const id = (artifactId || '').trim();
+    const match = id.match(CONNECTOR_VERSION_SUFFIX_RE);
+    if (!match) {
+        return id;
+    }
+    const version = parseInt(match[2], 10);
+    if (version < 2) {
+        return id;
+    }
+    const stem = match[1];
+    if (!stem) {
+        return id;
+    }
+    if (blockedNormalized
+            && (blockedNormalized.has(id) || blockedNormalized.has(stem))) {
+        return stem;
+    }
+    return id;
+}
+
+function isConnectorArtifactIdTaken(candidate, blockedNormalized) {
+    if (!blockedNormalized || blockedNormalized.size === 0) {
+        return false;
+    }
+    return blockedNormalized.has(normalizeConnectorArtifactId(candidate));
+}
+
+function nextConnectorSuggestedVersion(stem, blockedNormalized) {
     if (!stem) {
         return 2;
     }
     let maxVersion = 1;
-    if (blocked && blocked.size > 0) {
-        const versionPrefix = `${stem}-v`;
-        for (const reserved of blocked) {
+    if (blockedNormalized && blockedNormalized.size > 0) {
+        const versionPrefix = `${stem}v`;
+        for (const reserved of blockedNormalized) {
             if (reserved === stem) {
                 maxVersion = Math.max(maxVersion, 1);
             }
@@ -712,21 +770,21 @@ function nextConnectorSuggestedVersion(stem, blocked) {
     return Math.max(2, maxVersion + 1);
 }
 
-function firstAvailableVersionedConnectorName(stem, startVersion, blocked) {
+function firstAvailableVersionedConnectorName(stem, startVersion, blockedNormalized) {
     let version = Math.max(2, startVersion);
     for (let attempts = 0; attempts < 10000; attempts++) {
-        const candidate = `${stem}-v${version}`;
-        if (!isConnectorArtifactIdTaken(candidate, blocked)) {
+        const candidate = `${stem}v${version}`;
+        if (!isConnectorArtifactIdTaken(candidate, blockedNormalized)) {
             return candidate;
         }
         version += 1;
     }
-    return `${stem}-v${version}`;
+    return `${stem}v${version}`;
 }
 
 function suggestConnectorAlternateLocal(artifactId) {
-    const stem = stripConnectorVersionSuffix(artifactId) || 'connector';
-    const blocked = generatorReservedServerTypes;
+    const blocked = normalizedBlockedServerTypes();
+    const stem = stripConnectorVersionSuffix(artifactId, blocked) || 'connector';
     const version = nextConnectorSuggestedVersion(stem, blocked);
     return firstAvailableVersionedConnectorName(stem, version, blocked);
 }
@@ -741,11 +799,7 @@ function suggestConnectorAlternate(artifactId) {
 
 function formatServerTypeLabel(serverType) {
     if (!serverType) return '';
-    return serverType
-        .split('-')
-        .filter(Boolean)
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' ');
+    return toConnectorPascalCase(normalizeConnectorArtifactId(serverType));
 }
 
 function normalizeResultAppliesToInput(connectorName) {
@@ -764,40 +818,10 @@ function resolveArtifactIdForConnectorName(connectorName) {
     return local;
 }
 
-/** Similar reserved types (compact match, not exact); warn-only in UI. */
-function findSimilarReservedServerTypes(connectorName) {
-    if (normalizeResultAppliesToInput(connectorName)
-            && Array.isArray(generatorNormalizeResult.similarServerTypes)) {
-        return generatorNormalizeResult.similarServerTypes.map(t => String(t));
-    }
-    const artifactId = normalizeConnectorArtifactId(connectorName);
-    if (!artifactId || !generatorReservedServerTypes || generatorReservedServerTypes.size === 0) {
-        return [];
-    }
-    const compact = compactConnectorArtifactId(connectorName);
-    if (!compact) return [];
-    const similar = [];
-    for (const reserved of generatorReservedServerTypes) {
-        const reservedCompact = compactConnectorArtifactId(reserved);
-        if (reserved !== artifactId && reservedCompact === compact) {
-            similar.push(reserved);
-        }
-    }
-    return [...new Set(similar)].sort();
-}
-
 /** Exact duplicate against legacy ∪ in-repo; blocks Publish/Download. */
 function validateConnectorNameNotReserved(connectorName) {
     const artifactId = resolveArtifactIdForConnectorName(connectorName);
     if (normalizeResultAppliesToInput(connectorName)) {
-        if (generatorNormalizeResult.blockedPackageConflict === true) {
-            const conflicts = Array.isArray(generatorNormalizeResult.packageConflictTypes)
-                ? generatorNormalizeResult.packageConflictTypes
-                : [];
-            const existing = conflicts[0] || 'an existing module';
-            const pkg = compactConnectorArtifactId(connectorName);
-            return `Java package "${pkg}" matches existing SDK module "${existing}" (classpath/SPI conflict). Use a different name, for example "${suggestConnectorAlternate(artifactId)}".`;
-        }
         if (generatorNormalizeResult.blocked === true || generatorNormalizeResult.blockedExact === true) {
             return `Connector name resolves to server type "${artifactId}" which is reserved or already used. Choose a different name, for example "${suggestConnectorAlternate(artifactId)}".`;
         }
@@ -805,7 +829,7 @@ function validateConnectorNameNotReserved(connectorName) {
     if (!artifactId || !generatorReservedServerTypes) {
         return null;
     }
-    if (generatorReservedServerTypes.has(artifactId)) {
+    if (isExactReservedServerType(artifactId)) {
         return `Connector name resolves to server type "${artifactId}" which is reserved or already used. Choose a different name, for example "${suggestConnectorAlternate(artifactId)}".`;
     }
     return null;
@@ -823,7 +847,6 @@ function closeConnectorGeneratorModal() {
 function resetConnectorGeneratorForm() {
     generatorNormalizeResult = null;
     generatorNormalizeSeq += 1;
-    highlightSimilarConnectorCards([]);
     const nameInput = document.getElementById('connectorNameInput');
     const objectsList = document.getElementById('connectorObjectsList');
     const iconInput = document.getElementById('connectorIconInput');
@@ -843,6 +866,8 @@ function resetConnectorGeneratorForm() {
     }
     if (iconInput) iconInput.value = '';
     if (dropdownLabel) dropdownLabel.textContent = 'Select connector objects';
+    primaryObjectManualSelection = null;
+    updatePrimaryObjectField();
     clearConnectorGeneratorError();
     renderConnectorObjectPills();
     const refsContainer = document.getElementById('referencesContainer');
@@ -1429,6 +1454,25 @@ function getSelectedConnectorObjects() {
     return Array.from(inputs).filter(input => input.checked).map(input => input.value);
 }
 
+function syncCrawlerOptionsFromConnectorObjects() {
+    const selected = getSelectedConnectorObjects()
+        .map(kind => String(kind || '').trim().toUpperCase());
+    const syncMap = CONNECTOR_OBJECT_CRAWLER_OPTION_SYNC || {};
+    Object.entries(syncMap).forEach(([optionKey, objectKinds]) => {
+        const shouldCheck = selected.length > 0
+            && Array.isArray(objectKinds)
+            && objectKinds.some(kind => selected.includes(String(kind).trim().toUpperCase()));
+        document.querySelectorAll(
+            `.crawler-option-checkbox[data-option-type="CRAWLER_OPTIONS"][data-option-key="${optionKey}"]`
+        ).forEach(input => {
+            if (!input.disabled) {
+                input.checked = shouldCheck;
+            }
+        });
+    });
+    updateConnectorGeneratorActionButtons();
+}
+
 function renderConnectorObjectPills() {
     const pillList = document.getElementById('connectorObjectsPills');
     const placeholder = document.getElementById('connectorObjectsLabel');
@@ -1441,6 +1485,10 @@ function renderConnectorObjectPills() {
             placeholder.textContent = 'Select connector objects';
             placeholder.classList.remove('hidden');
         }
+        const connectorNameEmpty = (document.getElementById('connectorNameInput')?.value || '').trim();
+        updatePrimaryObjectField();
+        syncCrawlerOptionsFromConnectorObjects();
+        updateConnectorNameResolvedPanel(connectorNameEmpty, getConnectorNameValidationState(connectorNameEmpty));
         return;
     }
     if (placeholder) placeholder.classList.add('hidden');
@@ -1454,6 +1502,10 @@ function renderConnectorObjectPills() {
     });
     pillList.classList.remove('hidden');
     updateConnectorObjectsSelectedCount();
+    updatePrimaryObjectField();
+    syncCrawlerOptionsFromConnectorObjects();
+    const connectorName = (document.getElementById('connectorNameInput')?.value || '').trim();
+    updateConnectorNameResolvedPanel(connectorName, getConnectorNameValidationState(connectorName));
 }
 
 let connectorObjectsMenuPositionListener = null;
@@ -1884,7 +1936,8 @@ function collectConnectorGeneratorSubmission(options = {}) {
                 profiling: false,
                 dataQuality: false,
                 authenticationTypes: [],
-                credentialManagers: ['DATABASE']
+                credentialManagers: ['DATABASE'],
+                primaryObject: getResolvedPrimaryObject(selectedKinds)
             },
             crawlerOptions: buildCrawlerOptionsFromForm()
         },

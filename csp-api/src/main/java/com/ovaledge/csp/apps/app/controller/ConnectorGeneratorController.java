@@ -46,8 +46,9 @@ public class ConnectorGeneratorController {
     /**
      * Returns server type names blocked for new connectors: legacy txt list union in-repo SDK types.
      *
-     * <p>Values are canonical (normalized) identifiers. The UI should compare the normalized connector
-     * artifact id from {@link com.ovaledge.csp.validation.ServerTypeNormalizer} against this set.
+     * <p>Legacy platform names appear as listed in {@code legacy-platform-server-types.txt} (spaces,
+     * hyphens, underscores preserved). In-repo SDK modules use normalized ids. Compare a proposed connector
+     * id with {@link ServerTypeNormalizer#normalize(String)} — not raw string equality.
      *
      * @param repoRoot optional repository root; defaults to {@link ConnectorGeneratorService#resolveRepoRootPath(String)}
      * @return JSON body with key {@code reservedServerTypes}
@@ -64,11 +65,9 @@ public class ConnectorGeneratorController {
     /**
      * Normalizes a connector name the same way as generation ({@code artifactId} / {@code serverType}).
      *
-     * <p>Also reports exact blocks (legacy ∪ in-repo) and similar reserved types (compact/hyphen variants).
-     *
      * @param name raw connector name from the form
-     * @param repoRoot optional repository root for reserved/similar lookup
-     * @return JSON with {@code artifactId}, {@code compact}, {@code blockedExact}, {@code similarServerTypes}
+     * @param repoRoot optional repository root for reserved lookup
+     * @return JSON with {@code artifactId}, {@code blocked}, {@code blockedExact}, {@code suggestedAlternate}
      */
     @GetMapping("/normalize")
     public ResponseEntity<Map<String, Object>> normalizeConnectorName(
@@ -78,16 +77,8 @@ public class ConnectorGeneratorController {
         String artifactId = ServerTypeNormalizer.normalize(name);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("artifactId", artifactId);
-        body.put("compact", ServerTypeNormalizer.compact(name));
         body.put("blockedExact", LegacyPlatformServerTypes.isExactBlockedForNewConnector(name, repoRootPath));
-        body.put(
-                "blockedPackageConflict",
-                LegacyPlatformServerTypes.hasInRepoPackageConflict(name, repoRootPath));
         body.put("blocked", LegacyPlatformServerTypes.isBlockedForNewConnector(name, repoRootPath));
-        body.put(
-                "packageConflictTypes",
-                LegacyPlatformServerTypes.inRepoPackageConflictTypes(name, repoRootPath));
-        body.put("similarServerTypes", LegacyPlatformServerTypes.similarBlockedNames(name, repoRootPath));
         body.put(
                 "suggestedAlternate",
                 LegacyPlatformServerTypes.suggestAlternateForNewConnector(name, repoRootPath));

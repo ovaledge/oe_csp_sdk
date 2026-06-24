@@ -1,11 +1,11 @@
-package com.ovaledge.csp.apps.${artifactId}.quick;
+package com.ovaledge.csp.apps.${packageName}.quick;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 
 @SpringBootApplication(
-        scanBasePackages = "com.ovaledge.csp.apps.${artifactId}",
+        scanBasePackages = "com.ovaledge.csp.apps.${packageName}",
         exclude = {DataSourceAutoConfiguration.class}
 )
 public class ${classPrefix}QuickApplication {

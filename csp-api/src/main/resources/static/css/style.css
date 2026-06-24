@@ -1040,6 +1040,50 @@ body {
     margin-bottom: 8px;
 }
 
+.primary-object-context {
+    margin: 4px 0 8px;
+    color: #6B7280;
+    line-height: 1.4;
+}
+
+.primary-object-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 100%;
+    gap: 0;
+}
+
+.primary-object-toggle .protocol-toggle-btn {
+    flex: 1 1 0;
+    min-width: 140px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 0;
+}
+
+.primary-object-toggle .protocol-toggle-btn:first-child {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+
+.primary-object-toggle .protocol-toggle-btn:last-child {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.primary-object-code {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.primary-object-name {
+    font-weight: 500;
+}
+
 .capability-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(220px, 1fr));

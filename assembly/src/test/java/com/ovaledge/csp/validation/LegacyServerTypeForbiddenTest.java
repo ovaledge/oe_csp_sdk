@@ -3,11 +3,11 @@ package com.ovaledge.csp.validation;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Assembly-phase build guard for SDK connector {@code serverType} policy.
@@ -39,6 +39,13 @@ public class LegacyServerTypeForbiddenTest {
         List<String> duplicateProviderViolations = scan.duplicateProviderViolations();
 
         assertTrue(
+                scan.legacyViolationsFromConfig().isEmpty()
+                        && duplicateViolationsFromConfig.isEmpty()
+                        && scan.legacyViolationsFromRuntime().isEmpty()
+                        && duplicateViolationsFromRuntime.isEmpty()
+                        && scan.configRuntimeMismatches().isEmpty()
+                        && scan.runtimeInspectionErrors().isEmpty()
+                        && duplicateProviderViolations.isEmpty(),
                 "SDK connector(s) failed serverType validation. "
                         + "Legacy conflicts(config): " + scan.legacyViolationsFromConfig()
                         + " | Duplicate serverTypes(config): " + duplicateViolationsFromConfig
@@ -46,13 +53,6 @@ public class LegacyServerTypeForbiddenTest {
                         + " | Duplicate serverTypes(runtime getServerType): " + duplicateViolationsFromRuntime
                         + " | Config/runtime mismatches: " + scan.configRuntimeMismatches()
                         + " | Runtime inspection errors: " + scan.runtimeInspectionErrors()
-                        + " | Duplicate providers: " + duplicateProviderViolations,
-                scan.legacyViolationsFromConfig().isEmpty()
-                        && duplicateViolationsFromConfig.isEmpty()
-                        && scan.legacyViolationsFromRuntime().isEmpty()
-                        && duplicateViolationsFromRuntime.isEmpty()
-                        && scan.configRuntimeMismatches().isEmpty()
-                        && scan.runtimeInspectionErrors().isEmpty()
-                        && duplicateProviderViolations.isEmpty());
+                        + " | Duplicate providers: " + duplicateProviderViolations);
     }
 }

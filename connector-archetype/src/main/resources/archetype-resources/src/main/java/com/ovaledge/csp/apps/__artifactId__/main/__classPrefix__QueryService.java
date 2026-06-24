@@ -1,4 +1,4 @@
-package com.ovaledge.csp.apps.${artifactId}.main;
+package com.ovaledge.csp.apps.${packageName}.main;
 
 import com.ovaledge.csp.v3.core.apps.model.request.QueryRequest;
 import com.ovaledge.csp.v3.core.apps.model.response.QueryResponse;

@@ -13,9 +13,13 @@ class LegacyPlatformServerTypesTest {
 
     @Test
     void reservedTypes_shouldMatchArtifactStyleNormalization() {
-        assertTrue(LegacyPlatformServerTypes.isForbidden("qlik-sense"));
+        assertTrue(LegacyPlatformServerTypes.isForbidden("qliksense"));
         assertTrue(LegacyPlatformServerTypes.isForbidden("Qlik Sense"));
-        assertTrue(LegacyPlatformServerTypes.isForbidden("quickbooks-online"));
+        assertTrue(LegacyPlatformServerTypes.isForbidden("quickbooksonline"));
+        assertTrue(LegacyPlatformServerTypes.isForbidden("quickbooksdesktop"));
+        assertTrue(LegacyPlatformServerTypes.forbiddenTypes().contains("qlik sense"));
+        assertTrue(LegacyPlatformServerTypes.forbiddenTypes().contains("quickbooks-online"));
+        assertTrue(LegacyPlatformServerTypes.forbiddenTypes().contains("sapbo_universe"));
     }
 
     @Test
@@ -24,7 +28,7 @@ class LegacyPlatformServerTypesTest {
         var scan = SdkConnectorReactorScanner.scan(tempDir);
         assertTrue(scan.ownedServerTypes().contains("monetdb"));
         assertFalse(LegacyPlatformServerTypes.violatesSdkGate("monetdb", scan.ownedServerTypes()));
-        assertTrue(LegacyPlatformServerTypes.violatesSdkGate("qlik-sense", scan.ownedServerTypes()));
+        assertTrue(LegacyPlatformServerTypes.violatesSdkGate("qliksense", scan.ownedServerTypes()));
     }
 
     @Test
@@ -35,7 +39,7 @@ class LegacyPlatformServerTypesTest {
         assertTrue(blocked.contains("snowflake"));
         assertTrue(LegacyPlatformServerTypes.isBlockedForNewConnector("monetdb", tempDir));
         assertTrue(LegacyPlatformServerTypes.isBlockedForNewConnector("snowflake", tempDir));
-        assertFalse(LegacyPlatformServerTypes.isBlockedForNewConnector("my-custom-connector", tempDir));
+        assertFalse(LegacyPlatformServerTypes.isBlockedForNewConnector("mycustomconnector", tempDir));
     }
 
     @Test
@@ -44,8 +48,7 @@ class LegacyPlatformServerTypesTest {
         writeMinimalConnectorRepo(tempDir, "monetdb");
         assertTrue(LegacyPlatformServerTypes.isBlockedForNewConnector("Monet DB", tempDir));
         assertTrue(LegacyPlatformServerTypes.isBlockedForNewConnector("MonetDB", tempDir));
-        assertFalse(LegacyPlatformServerTypes.isExactBlockedForNewConnector("Monet DB", tempDir));
-        assertTrue(LegacyPlatformServerTypes.hasInRepoPackageConflict("Monet DB", tempDir));
+        assertTrue(LegacyPlatformServerTypes.isExactBlockedForNewConnector("Monet DB", tempDir));
     }
 
     /** Minimal reactor with one connector module for {@link SdkConnectorReactorScanner} integration checks. */

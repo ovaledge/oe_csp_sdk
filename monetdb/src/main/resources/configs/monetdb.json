@@ -1,7 +1,7 @@
 {
     "connectorMaster": {
         "server": "monetdb",
-        "displayName": "MonetDB",
+        "connectorName": "MonetDB",
         "tooltip": "MonetDB JDBC Connector",
         "oeDocs": "https://docs.ovaledge.com/connectors/connector-repositories/database/monetdb",
         "shortDescription": "MonetDB JDBC connector for connecting to MonetDB databases and extracting metadata and data",
@@ -44,6 +44,7 @@
         "connectionPooling": true,
         "queryTimeout": true,
         "sourceSystemMetrics": false,
+        "primaryObject": "TVC",
         "authenticationTypes": [
             "Username & Password"
         ],

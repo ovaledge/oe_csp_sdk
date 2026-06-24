@@ -22,5 +22,10 @@ Add dependency to assembly/pom.xml (so the connector is packaged into the assemb
   <artifactId>${artifactId}</artifactId>
 </dependency>
 
-Generated package: com.ovaledge.csp.apps.${artifactId}
-Connector class: com.ovaledge.csp.apps.${artifactId}.main.${classPrefix}Connector
+Generated package: com.ovaledge.csp.apps.${packageName}
+Connector class: com.ovaledge.csp.apps.${packageName}.main.${classPrefix}Connector
+
+Supported objects: ${classPrefix}MetadataService.getSupportedObjects() was scaffolded from your
+Connector Objects selection (see GENERATOR:START/END markers in that file). Refine display names,
+split subtypes when one ObjectKind maps to several source types (e.g. tables vs views), then
+implement getContainers, getObjects, and getFields for each kind.

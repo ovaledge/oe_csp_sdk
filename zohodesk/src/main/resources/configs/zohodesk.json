@@ -1,7 +1,7 @@
 {
   "connectorMaster" : {
     "server" : "zohodesk",
-    "displayName" : "Zohodesk",
+    "connectorName" : "Zohodesk",
     "tooltip" : "Zohodesk",
     "oeDocs" : "",
     "shortDescription" : "Zohodesk connector",
@@ -45,6 +45,7 @@
     "connectionPooling" : true,
     "queryTimeout" : false,
     "sourceSystemMetrics" : false,
+    "primaryObject" : "TVC",
     "authenticationTypes" : [ ],
     "credentialManagers" : [ "DATABASE" ],
     "usageCostModel" : "Usage Based"

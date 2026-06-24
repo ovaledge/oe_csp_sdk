@@ -6,14 +6,13 @@ import com.ovaledge.csp.validation.ServerTypeNormalizer;
 import com.ovaledge.csp.v3.core.apps.model.ObjectKind;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
@@ -21,21 +20,23 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.imageio.ImageIO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ConnectorGeneratorService {
+
+    private static final Logger log = LoggerFactory.getLogger(ConnectorGeneratorService.class);
 
     private static final int ICON_MAX_BYTES = 200 * 1024;
     private static final int ICON_SIZE_64 = 64;
@@ -93,6 +94,17 @@ public class ConnectorGeneratorService {
                     templateValues);
             writeTemplate(javaBase.resolve("quick/" + context.getClassPrefix() + "QuickApplication.java"),
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__artifactId__/quick/__classPrefix__QuickApplication.java",
+                    templateValues);
+
+            Path testJavaBase = moduleRoot.resolve("src/test/java/com/ovaledge/csp/apps/" + context.getPackageName());
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "ConnectorTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__ConnectorTest.java",
+                    templateValues);
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "MetadataServiceTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__MetadataServiceTest.java",
+                    templateValues);
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "QueryServiceTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__QueryServiceTest.java",
                     templateValues);
 
             Path resourcesBase = moduleRoot.resolve("src/main/resources");
@@ -229,6 +241,17 @@ public class ConnectorGeneratorService {
                     templateValues);
             writeTemplate(javaBase.resolve("quick/" + context.getClassPrefix() + "QuickApplication.java"),
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__artifactId__/quick/__classPrefix__QuickApplication.java",
+                    templateValues);
+
+            Path testJavaBase = moduleRoot.resolve("src/test/java/com/ovaledge/csp/apps/" + context.getPackageName());
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "ConnectorTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__ConnectorTest.java",
+                    templateValues);
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "MetadataServiceTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__MetadataServiceTest.java",
+                    templateValues);
+            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "QueryServiceTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__artifactId__/main/__classPrefix__QueryServiceTest.java",
                     templateValues);
 
             Path resourcesBase = moduleRoot.resolve("src/main/resources");
@@ -422,7 +445,7 @@ public class ConnectorGeneratorService {
         if (connectorName == null || connectorName.trim().isEmpty()) {
             errors.add("Connector Name is required.");
         } else if (ServerTypeNormalizer.hasDisallowedCharacters(connectorName)) {
-            errors.add("Connector Name may only contain letters, numbers, spaces, and hyphens (-).");
+            errors.add("Connector Name may only contain lowercase letters and numbers, and must start with a letter.");
         }
 
         List<String> objectKindInputs = request != null ? request.getObjectKinds() : List.of();
@@ -435,12 +458,12 @@ public class ConnectorGeneratorService {
             errors.add("Connector Name must contain at least one alphanumeric character.");
         }
 
-        String packageName = artifactId.replace("-", "");
+        String packageName = artifactId;
         if (packageName.isEmpty() || !Character.isLetter(packageName.charAt(0))) {
             errors.add("Connector Name must start with a letter for a valid package name.");
         }
 
-        String classPrefix = buildClassPrefix(artifactId);
+        String classPrefix = ServerTypeNormalizer.toPascalCase(artifactId);
         if (classPrefix.isEmpty() || !Character.isLetter(classPrefix.charAt(0))) {
             errors.add("Connector Name must start with a letter for a valid class name.");
         }
@@ -456,8 +479,14 @@ public class ConnectorGeneratorService {
             throw new ConnectorGeneratorValidationException(errors);
         }
 
+        String primaryObjectOverride = request.getManifest() != null
+                && request.getManifest().getConnectorMaster() != null
+                ? request.getManifest().getConnectorMaster().getPrimaryObject()
+                : null;
+        String primaryObject = PrimaryObjectResolver.resolve(objectKinds, primaryObjectOverride);
+
         return new ConnectorGenerationContext(connectorName.trim(), artifactId, packageName,
-                classPrefix, artifactId, objectKinds);
+                classPrefix, artifactId, objectKinds, primaryObject);
     }
 
     private void validateManifestAndReferences(ConnectorGeneratorRequest request, List<String> errors) {
@@ -661,24 +690,6 @@ public class ConnectorGeneratorService {
         return ServerTypeNormalizer.normalize(connectorName);
     }
 
-    private String buildClassPrefix(String artifactId) {
-        if (artifactId == null || artifactId.isEmpty()) {
-            return "";
-        }
-        String[] parts = artifactId.split("-");
-        StringBuilder sb = new StringBuilder();
-        for (String part : parts) {
-            if (part.isEmpty()) {
-                continue;
-            }
-            sb.append(Character.toUpperCase(part.charAt(0)));
-            if (part.length() > 1) {
-                sb.append(part.substring(1));
-            }
-        }
-        return sb.toString();
-    }
-
     private void writeCapabilityManifest(
             Path path,
             ConnectorGenerationContext context,
@@ -693,7 +704,7 @@ public class ConnectorGeneratorService {
         Map<String, Object> root = new LinkedHashMap<>();
         Map<String, Object> connectorMaster = new LinkedHashMap<>();
         connectorMaster.put("server", context.getArtifactId());
-        connectorMaster.put("displayName", context.getConnectorName());
+        connectorMaster.put("connectorName", context.getConnectorName());
         connectorMaster.put("tooltip", context.getConnectorName());
         connectorMaster.put("oeDocs", nullToEmpty(cm.getOeDocs()));
         connectorMaster.put("shortDescription", nullToEmpty(cm.getShortDescription()));
@@ -703,8 +714,7 @@ public class ConnectorGeneratorService {
         connectorMaster.put("imgSource", "img/db/" + context.getArtifactId());
         connectorMaster.put("dialect", null);
         connectorMaster.put("protocol", cm.getProtocol());
-        connectorMaster.put("dtoRegisterName",
-                "com.ovaledge.csp.apps." + context.getArtifactId() + ".main." + context.getClassPrefix() + "Connector");
+        connectorMaster.put("dtoRegisterName", context.getConnectorFqcn());
         connectorMaster.put("accessDtoRegisterName", null);
         connectorMaster.put("driver", null);
         connectorMaster.put("oeConnCategory", cm.getOeConnCategory());
@@ -738,6 +748,7 @@ public class ConnectorGeneratorService {
         connectorMaster.put("connectionPooling", true);
         connectorMaster.put("queryTimeout", false);
         connectorMaster.put("sourceSystemMetrics", false);
+        connectorMaster.put("primaryObject", context.getPrimaryObject());
         connectorMaster.put("authenticationTypes",
                 cm.getAuthenticationTypes() != null ? cm.getAuthenticationTypes() : List.of());
         connectorMaster.put("credentialManagers",
@@ -746,38 +757,17 @@ public class ConnectorGeneratorService {
         connectorMaster.put("usageCostModel", cm.getUsageCostModel());
         root.put("connectorMaster", connectorMaster);
 
-        Map<String, Object> crawlerSettings = new LinkedHashMap<>();
-        crawlerSettings.put("name", context.getConnectorName());
-        crawlerSettings.put("server", context.getArtifactId());
-        crawlerSettings.put("connType", 0);
-        crawlerSettings.put("tableviewncols", true);
-        crawlerSettings.put("relationship", boolOrDefault(cs.getRelationship(), false));
-        crawlerSettings.put("procnfunc", boolOrDefault(cs.getProcnfunc(), false));
-        crawlerSettings.put("reports", boolOrDefault(cs.getReports(), false));
-        crawlerSettings.put("reportcolumns", boolOrDefault(cs.getReportcolumns(), false));
-        crawlerSettings.put("querypermissionmode", false);
-        crawlerSettings.put("indexes", boolOrDefault(cs.getIndexes(), false));
-        crawlerSettings.put("settings", boolOrDefault(cs.getSettings(), true));
-        crawlerSettings.put("buildlineage", false);
-        crawlerSettings.put("usernotification", true);
-        crawlerSettings.put("contexturl", true);
-        crawlerSettings.put("rdam", false);
-        crawlerSettings.put("rbac", false);
-        crawlerSettings.put("ubac", false);
-        crawlerSettings.put("rpe", false);
-        crawlerSettings.put("upe", false);
-        crawlerSettings.put("uhp", false);
-        crawlerSettings.put("une", false);
-        crawlerSettings.put("rne", false);
-        crawlerSettings.put("unemail", false);
-        crawlerSettings.put("remotepolicy", false);
-        crawlerSettings.put("fullcrawl", boolOrDefault(cs.getFullcrawl(), true));
-        crawlerSettings.put("incrementalcrawl", boolOrDefault(cs.getIncrementalcrawl(), false));
-        crawlerSettings.put("profiletablesandcols", false);
-        crawlerSettings.put("profileviewsandcols", false);
+        List<Map<String, String>> crawlerOptions =
+                buildCrawlerOptions(context.getObjectKinds(), manifest.getCrawlerOptions());
+        Map<String, Object> crawlerSettings = buildCrawlerSettings(
+                context.getConnectorName(),
+                context.getArtifactId(),
+                context.getObjectKinds(),
+                crawlerOptions,
+                cs);
         root.put("crawlerSettings", crawlerSettings);
 
-        root.put("crawlerOptions", buildCrawlerOptions(context.getObjectKinds(), manifest.getCrawlerOptions()));
+        root.put("crawlerOptions", crawlerOptions);
         root.put("credentialManagerMappings",
                 cm.getCredentialManagers() != null && !cm.getCredentialManagers().isEmpty()
                         ? cm.getCredentialManagers() : List.of("DATABASE"));
@@ -810,10 +800,12 @@ public class ConnectorGeneratorService {
             List<ObjectKind> kinds = objectKinds != null ? objectKinds : List.of();
             boolean hasTableLike = kinds.contains(ObjectKind.ENTITY) || kinds.contains(ObjectKind.VIEW);
             boolean hasReportLike = kinds.contains(ObjectKind.REPORT);
+            boolean hasDatasets = kinds.contains(ObjectKind.DATASET);
             boolean hasFiles = kinds.contains(ObjectKind.FILE) || kinds.contains(ObjectKind.FILEFOLDERS);
             if (hasTableLike) addCrawlerOption(options, dedupe, "CRAWLER_OPTIONS", "TVC");
-            if (hasReportLike) addCrawlerOption(options, dedupe, "CRAWLER_OPTIONS", "RS");
-            if (hasFiles) addCrawlerOption(options, dedupe, "CRAWLER_OPTIONS", "FS");
+            if (hasReportLike) addCrawlerOption(options, dedupe, "CRAWLER_OPTIONS", "R");
+            if (hasDatasets) addCrawlerOption(options, dedupe, "CRAWLER_OPTIONS", "DS");
+            if (hasFiles) addCrawlerOption(options, dedupe, "CRAWLER_OPTIONS", "FF");
         }
 
         // Always keep required crawler preferences present
@@ -829,6 +821,119 @@ public class ConnectorGeneratorService {
         item.put("optionType", type);
         item.put("optionKey", key);
         options.add(item);
+    }
+
+    private Map<String, Object> buildCrawlerSettings(
+            String connectorName,
+            String server,
+            List<ObjectKind> objectKinds,
+            List<Map<String, String>> crawlerOptions,
+            ConnectorGeneratorRequest.CrawlerSettingsInput overrides) {
+        List<ObjectKind> kinds = objectKinds != null ? objectKinds : List.of();
+        ConnectorGeneratorRequest.CrawlerSettingsInput cs =
+                overrides != null ? overrides : new ConnectorGeneratorRequest.CrawlerSettingsInput();
+
+        boolean hasTableLike = containsObjectKind(kinds, ObjectKind.ENTITY, ObjectKind.VIEW);
+        boolean hasReport = kinds.contains(ObjectKind.REPORT);
+        boolean hasDataset = kinds.contains(ObjectKind.DATASET);
+        boolean hasFiles = containsObjectKind(kinds, ObjectKind.FILE, ObjectKind.FILEFOLDERS);
+        boolean hasFunctionLike = containsObjectKind(kinds, ObjectKind.FUNCTION, ObjectKind.PROCEDURE);
+        boolean hasIndex = kinds.contains(ObjectKind.INDEX);
+
+        boolean tableviewncols = hasTableLike || hasCrawlerOption(crawlerOptions, "CRAWLER_OPTIONS", "TVC");
+        boolean reports = hasReport || hasCrawlerOption(crawlerOptions, "CRAWLER_OPTIONS", "R");
+        boolean reportcolumns = hasReport || hasCrawlerOption(crawlerOptions, "CRAWLER_OPTIONS", "RC");
+        boolean datasets = hasDataset || hasCrawlerOption(crawlerOptions, "CRAWLER_OPTIONS", "DS");
+        boolean fileFolders = hasFiles || hasCrawlerOption(crawlerOptions, "CRAWLER_OPTIONS", "FF");
+        boolean relationship = hasCrawlerOption(crawlerOptions, "CRAWLER_OPTIONS", "RS");
+        boolean procnfunc = hasFunctionLike || hasCrawlerOption(crawlerOptions, "CRAWLER_OPTIONS", "PF");
+        boolean indexes = hasIndex || hasCrawlerOption(crawlerOptions, "CRAWLER_OPTIONS", "IN");
+        boolean querypermissionmode = hasCrawlerOption(crawlerOptions, "CRAWLER_OPTIONS", "QP");
+        boolean fullcrawl = !hasCrawlTypeOptions(crawlerOptions)
+                || hasCrawlerOption(crawlerOptions, "CRAWL_TYPES", "FC");
+        boolean incrementalcrawl = hasCrawlerOption(crawlerOptions, "CRAWL_TYPES", "INC");
+        boolean profiletablesandcols = hasCrawlerOption(crawlerOptions, "PROFILE_OPTIONS", "TC");
+        boolean profileviewsandcols = hasCrawlerOption(crawlerOptions, "PROFILE_OPTIONS", "VC");
+
+        Map<String, Object> crawlerSettings = new LinkedHashMap<>();
+        crawlerSettings.put("name", connectorName);
+        crawlerSettings.put("server", server);
+        crawlerSettings.put("connType", 0);
+        crawlerSettings.put("tableviewncols", boolOrDefault(cs.getTableviewncols(), tableviewncols));
+        crawlerSettings.put("relationship", boolOrDefault(cs.getRelationship(), relationship));
+        crawlerSettings.put("procnfunc", boolOrDefault(cs.getProcnfunc(), procnfunc));
+        crawlerSettings.put("reports", boolOrDefault(cs.getReports(), reports));
+        crawlerSettings.put("reportcolumns", boolOrDefault(cs.getReportcolumns(), reportcolumns));
+        crawlerSettings.put("querypermissionmode", boolOrDefault(cs.getQuerypermissionmode(), querypermissionmode));
+        crawlerSettings.put("indexes", boolOrDefault(cs.getIndexes(), indexes));
+        crawlerSettings.put("settings", boolOrDefault(cs.getSettings(), true));
+        crawlerSettings.put("buildlineage", false);
+        crawlerSettings.put("usernotification", true);
+        crawlerSettings.put("contexturl", true);
+        crawlerSettings.put("rdam", false);
+        crawlerSettings.put("rbac", false);
+        crawlerSettings.put("ubac", false);
+        crawlerSettings.put("rpe", false);
+        crawlerSettings.put("upe", false);
+        crawlerSettings.put("uhp", false);
+        crawlerSettings.put("une", false);
+        crawlerSettings.put("rne", false);
+        crawlerSettings.put("unemail", false);
+        crawlerSettings.put("remotepolicy", false);
+        crawlerSettings.put("fullcrawl", boolOrDefault(cs.getFullcrawl(), fullcrawl));
+        crawlerSettings.put("incrementalcrawl", boolOrDefault(cs.getIncrementalcrawl(), incrementalcrawl));
+        crawlerSettings.put("profiletablesandcols", boolOrDefault(cs.getProfiletablesandcols(), profiletablesandcols));
+        crawlerSettings.put("profileviewsandcols", boolOrDefault(cs.getProfileviewsandcols(), profileviewsandcols));
+        crawlerSettings.put("datasets", boolOrDefault(cs.getDatasets(), datasets));
+        crawlerSettings.put("fileFolders", boolOrDefault(cs.getFileFolders(), fileFolders));
+        return crawlerSettings;
+    }
+
+    private boolean containsObjectKind(List<ObjectKind> kinds, ObjectKind... candidates) {
+        for (ObjectKind candidate : candidates) {
+            if (kinds.contains(candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasCrawlerOption(List<Map<String, String>> options, String optionType, String optionKey) {
+        if (options == null || options.isEmpty()) {
+            return false;
+        }
+        String type = optionType.trim().toUpperCase(Locale.ROOT);
+        String key = optionKey.trim().toUpperCase(Locale.ROOT);
+        for (Map<String, String> option : options) {
+            if (option == null) {
+                continue;
+            }
+            String actualType = option.get("optionType");
+            String actualKey = option.get("optionKey");
+            if (actualType != null
+                    && actualKey != null
+                    && type.equals(actualType.trim().toUpperCase(Locale.ROOT))
+                    && key.equals(actualKey.trim().toUpperCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasCrawlTypeOptions(List<Map<String, String>> options) {
+        if (options == null || options.isEmpty()) {
+            return false;
+        }
+        for (Map<String, String> option : options) {
+            if (option == null) {
+                continue;
+            }
+            String actualType = option.get("optionType");
+            if (actualType != null && "CRAWL_TYPES".equalsIgnoreCase(actualType.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void writeReferencesMarkdown(Path path, List<ConnectorGeneratorRequest.ReferenceInput> references) throws IOException {
@@ -900,11 +1005,22 @@ public class ConnectorGeneratorService {
         Files.writeString(path, rendered, StandardCharsets.UTF_8);
     }
 
+    private void writeTemplateIfAbsentWithInfo(Path path, String templateName, Map<String, String> values) throws IOException {
+        if (Files.exists(path)) {
+            log.info("Skipping existing generated test file: {}", path);
+            return;
+        }
+        writeTemplate(path, templateName, values);
+    }
+
     private String readTemplate(String templateName) throws IOException {
         ClassPathResource resource = new ClassPathResource(templateName);
-        try (InputStream inputStream = resource.getInputStream()) {
-            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        if (resource.exists()) {
+            try (InputStream inputStream = resource.getInputStream()) {
+                return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            }
         }
+        throw new FileNotFoundException("Template not found on classpath: " + templateName);
     }
 
     private byte[] zipDirectory(Path sourceDir) throws IOException {

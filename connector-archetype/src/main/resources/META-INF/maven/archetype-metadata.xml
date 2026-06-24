@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <archetype-descriptor name="oe-csp-connector-archetype">
     <requiredProperties>
+        <requiredProperty key="packageName">
+            <defaultValue>${artifactId}</defaultValue>
+        </requiredProperty>
         <requiredProperty key="classPrefix"/>
         <requiredProperty key="sdkVersion">
             <defaultValue>${project.version}</defaultValue>
@@ -24,6 +27,12 @@
             <directory>src/main/resources</directory>
             <includes>
                 <include>**/*</include>
+            </includes>
+        </fileSet>
+        <fileSet filtered="true" encoding="UTF-8">
+            <directory>src/test/java/com/ovaledge/csp/apps/__artifactId__</directory>
+            <includes>
+                <include>**/*.java</include>
             </includes>
         </fileSet>
     </fileSets>
