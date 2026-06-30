@@ -1,7 +1,7 @@
 {
   "connectorMaster": {
     "server": "mysql",
-    "displayName": "MySQL",
+    "connectorName": "MySQL",
     "tooltip": "MySQL",
     "oeDocs": "https://docs.ovaledge.com/connectors/connector-repositories/rdbms/mysql",
     "shortDescription": "MySQL Database connector",
@@ -45,6 +45,7 @@
     "connectionPooling": true,
     "queryTimeout": true,
     "sourceSystemMetrics": true,
+    "primaryObject": "TVC",
     "authenticationTypes": [
       "UserId & Password Authentication",
       "Azure Entra ID Authentication"

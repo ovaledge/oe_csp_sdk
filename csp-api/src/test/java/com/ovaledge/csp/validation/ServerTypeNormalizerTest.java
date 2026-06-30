@@ -12,55 +12,74 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ServerTypeNormalizerTest {
 
     @Test
-    void normalize_shouldAllowHyphensAndCollapseSpaces() {
-        assertEquals("qlik-sense", ServerTypeNormalizer.normalize("Qlik Sense"));
-        assertEquals("qlik-sense", ServerTypeNormalizer.normalize("qlik-sense"));
-        assertEquals("quickbooks-online", ServerTypeNormalizer.normalize(" quickbooks---online "));
+    void normalize_shouldLowercaseAndStripNonAlphanumeric() {
+        assertEquals("qliksense", ServerTypeNormalizer.normalize("Qlik Sense"));
+        assertEquals("qliksense", ServerTypeNormalizer.normalize("qlik-sense"));
+        assertEquals("quickbooksonline", ServerTypeNormalizer.normalize(" quickbooks---online "));
         assertEquals("awsglue", ServerTypeNormalizer.normalize("Aws@Glue"));
-        assertEquals("monet-db", ServerTypeNormalizer.normalize("Monet DB"));
+        assertEquals("monetdb", ServerTypeNormalizer.normalize("Monet DB"));
         assertEquals("mysql", ServerTypeNormalizer.normalize("mysql"));
         assertEquals("", ServerTypeNormalizer.normalize(null));
     }
 
     @Test
-    void compact_shouldStripHyphensForPackageComparison() {
-        assertEquals("monetdb", ServerTypeNormalizer.compact("Monet DB"));
-        assertEquals("monetdb", ServerTypeNormalizer.compact("monetdb"));
+    void toPascalCase_shouldCapitalizeFirstCharacter() {
+        assertEquals("Qliksense", ServerTypeNormalizer.toPascalCase("qliksense"));
+        assertEquals("Mysql", ServerTypeNormalizer.toPascalCase("mysql"));
+        assertEquals("Mysql2", ServerTypeNormalizer.toPascalCase("mysql2"));
+        assertEquals("", ServerTypeNormalizer.toPascalCase(""));
     }
 
     @Test
-    void hasDisallowedCharacters_shouldRejectSpecialCharsExceptHyphen() {
+    void isValidConnectorId_shouldAcceptLowercaseAlphanumericStartingWithLetter() {
+        assertTrue(ServerTypeNormalizer.isValidConnectorId("mysql"));
+        assertTrue(ServerTypeNormalizer.isValidConnectorId("mysql2"));
+        assertFalse(ServerTypeNormalizer.isValidConnectorId("2mysql"));
+        assertFalse(ServerTypeNormalizer.isValidConnectorId("my-connector"));
+        assertFalse(ServerTypeNormalizer.isValidConnectorId("MyConnector"));
+        assertFalse(ServerTypeNormalizer.isValidConnectorId(""));
+    }
+
+    @Test
+    void hasDisallowedCharacters_shouldRejectInvalidConnectorIds() {
         assertTrue(ServerTypeNormalizer.hasDisallowedCharacters("aws@glue"));
         assertTrue(ServerTypeNormalizer.hasDisallowedCharacters("foo.bar"));
-        assertFalse(ServerTypeNormalizer.hasDisallowedCharacters("my-connector"));
-        assertFalse(ServerTypeNormalizer.hasDisallowedCharacters("Monet DB"));
+        assertTrue(ServerTypeNormalizer.hasDisallowedCharacters("my-connector"));
+        assertTrue(ServerTypeNormalizer.hasDisallowedCharacters("Monet DB"));
+        assertFalse(ServerTypeNormalizer.hasDisallowedCharacters("myconnector"));
     }
 
     @Test
     void suggestAlternate_withoutBlockedSet_shouldDefaultToV2() {
-        assertEquals("mysql-v2", ServerTypeNormalizer.suggestAlternate("mysql"));
-        assertEquals("my-connector-v2", ServerTypeNormalizer.suggestAlternate("my-connector"));
+        assertEquals("mysqlv2", ServerTypeNormalizer.suggestAlternate("mysql"));
+        assertEquals("myconnectorv2", ServerTypeNormalizer.suggestAlternate("myconnector"));
     }
 
     @Test
     void suggestAlternate_shouldIncrementVersionWhenVariantsExist() {
-        Set<String> blocked = Set.of("mysql", "mysql-v2");
-        assertEquals("mysql-v3", ServerTypeNormalizer.suggestAlternate("mysql", blocked));
-        assertEquals("mysql-v3", ServerTypeNormalizer.suggestAlternate("mysql-v2", blocked));
+        Set<String> blocked = Set.of("mysql", "mysqlv2");
+        assertEquals("mysqlv3", ServerTypeNormalizer.suggestAlternate("mysql", blocked));
+        assertEquals("mysqlv3", ServerTypeNormalizer.suggestAlternate("mysqlv2", blocked));
     }
 
     @Test
-    void suggestAlternate_shouldSkipPackageCompactCollisions() {
+    void suggestAlternate_shouldSkipTakenVersionVariants() {
         Set<String> blocked = Set.of("monetdb");
-        assertEquals("monet-db-v2", ServerTypeNormalizer.suggestAlternate("monet-db", blocked));
-        Set<String> withV2 = Set.of("monetdb", "monet-db-v2");
-        assertEquals("monet-db-v3", ServerTypeNormalizer.suggestAlternate("monet-db", withV2));
+        assertEquals("monetdbv2", ServerTypeNormalizer.suggestAlternate("monetdb", blocked));
+        Set<String> withV2 = Set.of("monetdb", "monetdbv2");
+        assertEquals("monetdbv3", ServerTypeNormalizer.suggestAlternate("monetdb", withV2));
     }
 
     @Test
-    void stripTrailingVersionSuffix_shouldRemoveVersionOnlyAtEnd() {
-        assertEquals("mysql", ServerTypeNormalizer.stripTrailingVersionSuffix("mysql-v2"));
-        assertEquals("my-connector", ServerTypeNormalizer.stripTrailingVersionSuffix("my-connector-v10"));
-        assertEquals("mysql", ServerTypeNormalizer.stripTrailingVersionSuffix("mysql"));
+    void stripTrailingVersionSuffix_shouldStripOnlyWhenBlockedContext() {
+        Set<String> blocked = Set.of("mysql", "mysqlv2");
+        assertEquals("mysql", ServerTypeNormalizer.stripTrailingVersionSuffix("mysqlv2", blocked));
+        assertEquals("mysql", ServerTypeNormalizer.stripTrailingVersionSuffix("mysql", blocked));
+
+        Set<String> empty = Set.of();
+        assertEquals("archivev2", ServerTypeNormalizer.stripTrailingVersionSuffix("archivev2", empty));
+
+        Set<String> archiveBlocked = Set.of("archivev2");
+        assertEquals("archive", ServerTypeNormalizer.stripTrailingVersionSuffix("archivev2", archiveBlocked));
     }
 }

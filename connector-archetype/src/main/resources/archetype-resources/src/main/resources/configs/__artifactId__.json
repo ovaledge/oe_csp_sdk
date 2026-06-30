@@ -1,7 +1,7 @@
 {
   "connectorMaster": {
     "server": "${artifactId}",
-    "displayName": "${connectorName}",
+    "connectorName": "${connectorName}",
     "tooltip": "${connectorName}",
     "oeDocs": "",
     "shortDescription": "${connectorName} connector",
@@ -11,7 +11,7 @@
     "imgSource": "img/db/${artifactId}",
     "dialect": null,
     "protocol": "API",
-    "dtoRegisterName": "com.ovaledge.csp.apps.${artifactId}.main.${classPrefix}Connector",
+    "dtoRegisterName": "com.ovaledge.csp.apps.${packageName}.main.${classPrefix}Connector",
     "accessDtoRegisterName": null,
     "driver": null,
     "oeConnCategory": "Application Connectors",
@@ -45,6 +45,7 @@
     "connectionPooling": true,
     "queryTimeout": false,
     "sourceSystemMetrics": false,
+    "primaryObject": "${primaryObject}",
     "authenticationTypes": [],
     "credentialManagers": [
       "DATABASE"

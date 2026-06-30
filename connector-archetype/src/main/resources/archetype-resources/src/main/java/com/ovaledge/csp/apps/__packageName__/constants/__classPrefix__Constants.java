@@ -1,4 +1,4 @@
-package com.ovaledge.csp.apps.${artifactId}.constants;
+package com.ovaledge.csp.apps.${packageName}.constants;
 
 public class ${classPrefix}Constants {
 

@@ -130,10 +130,10 @@
                                 </div>
                                 <div class="connector-name-row">
                                     <input type="text" id="connectorNameInput" class="connector-name-input"
-                                        placeholder="e.g. My Data Source"
+                                        placeholder="e.g. mydatasource"
                                         autocomplete="off"
                                         aria-describedby="connectorNameResolved connectorNameHint"
-                                        title="Letters, numbers, spaces, and hyphens only (serverType / module id)">
+                                        title="Lowercase letters and numbers only; must start with a letter (serverType / module id)">
                                     <button type="button" id="reservedNamesBtn" class="icon-btn reserved-names-btn"
                                         title="View reserved server types"
                                         aria-label="View reserved server types"
@@ -182,6 +182,11 @@
                                     </button>
                                     <div id="connectorObjectsList" class="dropdown-menu hidden"></div>
                                 </div>
+                            </div>
+                            <div id="primaryObjectFieldGroup" class="form-group hidden">
+                                <label>Primary Object<span class="required">*</span></label>
+                                <p id="primaryObjectContext" class="help-text primary-object-context"></p>
+                                <div id="primaryObjectOptions" class="protocol-toggle primary-object-toggle" role="radiogroup" aria-label="Primary object"></div>
                             </div>
                             <div class="form-group">
                                 <label for="connectorIconInput">Connector Icon (PNG/JPG/JPEG/SVG; for PNG/JPG/JPEG use 64×64 or 128×128, up to 200 KB)<span class="required">*</span></label>
