@@ -473,7 +473,7 @@ void setUp() {
 
 ---
 
-#### Symptom: LegacyServerTypeForbiddenTest fails
+#### Symptom: CspSdkServerTypeValidator fails (assembly package)
 
 **Possible causes:**
 - ServerType conflicts with legacy platform types

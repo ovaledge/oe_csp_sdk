@@ -63,7 +63,7 @@ public class ZohodeskQueryService implements QueryService {
         }
     }
 
-    static String resolveSubtype(QueryRequest request, boolean reportType) {
+    public static String resolveSubtype(QueryRequest request, boolean reportType) {
         if (request == null) {
             return reportType ? ZohodeskConstants.OBJECT_SUBTYPE_REPORTS : ZohodeskConstants.OBJECT_SUBTYPE_TICKETS;
         }
@@ -132,7 +132,7 @@ public class ZohodeskQueryService implements QueryService {
         return null;
     }
 
-    static List<Map<String, Object>> normalizeReportRows(
+    public static List<Map<String, Object>> normalizeReportRows(
             Map<String, Object> response,
             List<String> requestedFields,
             int limit,

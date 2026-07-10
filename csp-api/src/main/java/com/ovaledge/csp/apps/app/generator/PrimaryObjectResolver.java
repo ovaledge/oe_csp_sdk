@@ -1,8 +1,11 @@
 package com.ovaledge.csp.apps.app.generator;
 
 import com.ovaledge.csp.v3.core.apps.model.ObjectKind;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Resolves {@code connectorMaster.primaryObject} from selected {@link ObjectKind}s.
@@ -10,19 +13,27 @@ import java.util.Locale;
  * <p>Values are platform primary-object codes ({@code TVC}, {@code R}, {@code DS}, {@code FF})
  * used during connector registration and crawl/service flows.
  */
-final class PrimaryObjectResolver {
+public final class PrimaryObjectResolver {
 
-    static final String TVC = "TVC";
-    static final String REPORTS = "R";
-    static final String DATASETS = "DS";
-    static final String FILE_FOLDERS = "FF";
+    public static final String TVC = "TVC";
+    public static final String REPORTS = "R";
+    public static final String DATASETS = "DS";
+    public static final String FILE_FOLDERS = "FF";
+
+    private static final List<String> VALID_CODE_LIST = List.of(TVC, REPORTS, DATASETS, FILE_FOLDERS);
+    private static final Set<String> VALID_CODES = Collections.unmodifiableSet(new LinkedHashSet<>(VALID_CODE_LIST));
 
     private PrimaryObjectResolver() {
     }
 
-    static String resolve(List<ObjectKind> kinds, String override) {
+    public static String resolve(List<ObjectKind> kinds, String override) {
         if (override != null && !override.trim().isEmpty()) {
-            return override.trim().toUpperCase(Locale.ROOT);
+            String normalized = override.trim().toUpperCase(Locale.ROOT);
+            if (!VALID_CODES.contains(normalized)) {
+                throw new IllegalArgumentException(
+                        "Invalid primaryObject override '" + override + "'. Valid values: " + VALID_CODE_LIST);
+            }
+            return normalized;
         }
         if (kinds == null || kinds.isEmpty()) {
             return TVC;
@@ -39,6 +50,12 @@ final class PrimaryObjectResolver {
         }
         if (kinds.contains(ObjectKind.FILE) || kinds.contains(ObjectKind.FILEFOLDERS)) {
             return FILE_FOLDERS;
+        }
+        boolean hasFunctionLike = kinds.contains(ObjectKind.FUNCTION) || kinds.contains(ObjectKind.PROCEDURE);
+        if (hasFunctionLike) {
+            throw new IllegalArgumentException(
+                    "Cannot resolve primaryObject for FUNCTION/PROCEDURE-only connectors. "
+                            + "Add at least one of ENTITY, VIEW, REPORT, DATASET, FILE, or FILEFOLDERS.");
         }
         return TVC;
     }

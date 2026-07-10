@@ -45,6 +45,8 @@ public class ConnectorGeneratorService {
             "<!-- Connector generator marker (modules): DO NOT REMOVE. New connector modules are inserted above this line. -->";
     private static final String DEP_MARKER_NEW =
             "<!-- Connector generator marker (dependencies): DO NOT REMOVE. New connector dependencies are inserted above this line. -->";
+    private static final String TEST_REPORT_MODULES_OPEN = "<csp.sdk.test.report.modules>";
+    private static final String TEST_REPORT_MODULES_CLOSE = "</csp.sdk.test.report.modules>";
 
     private final TemplateEngine templateEngine = new TemplateEngine();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -59,7 +61,8 @@ public class ConnectorGeneratorService {
     }
 
     public ConnectorGeneratorResult generate(ConnectorGeneratorRequest request, MultipartFile icon) {
-        ConnectorGenerationContext context = validateAndNormalize(request);
+        Path repoRootPath = resolveRepoRootPath(request != null ? request.getRepoRoot() : null);
+        ConnectorGenerationContext context = validateAndNormalize(request, repoRootPath);
         IconSpec iconSpec = validateIcon(icon);
         String iconExtension = iconSpec.extension();
 
@@ -96,16 +99,7 @@ public class ConnectorGeneratorService {
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__packageName__/quick/__classPrefix__QuickApplication.java",
                     templateValues);
 
-            Path testJavaBase = moduleRoot.resolve("src/test/java/com/ovaledge/csp/apps/" + context.getPackageName());
-            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "ConnectorTest.java"),
-                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__packageName__/main/__classPrefix__ConnectorTest.java",
-                    templateValues);
-            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "MetadataServiceTest.java"),
-                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__packageName__/main/__classPrefix__MetadataServiceTest.java",
-                    templateValues);
-            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "QueryServiceTest.java"),
-                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__packageName__/main/__classPrefix__QueryServiceTest.java",
-                    templateValues);
+            writeGeneratedUnitTests(moduleRoot, context, templateValues);
 
             Path resourcesBase = moduleRoot.resolve("src/main/resources");
             Path servicesPath = resourcesBase.resolve("META-INF/services");
@@ -145,10 +139,6 @@ public class ConnectorGeneratorService {
      * preserved for potential future reuse.
      */
     public Map<String, String> generateToDirectory(ConnectorGeneratorRequest request, MultipartFile icon, String repoRoot) {
-        ConnectorGenerationContext context = validateAndNormalize(request);
-        IconSpec iconSpec = validateIcon(icon);
-        String iconExtension = iconSpec.extension();
-
         List<String> errors = new ArrayList<>();
         if (repoRoot == null || repoRoot.trim().isEmpty()) {
             errors.add("Repository root path (repoRoot) is required.");
@@ -199,6 +189,10 @@ public class ConnectorGeneratorService {
             throw new ConnectorGeneratorValidationException(errors);
         }
 
+        ConnectorGenerationContext context = validateAndNormalize(request, repoRootPath);
+        IconSpec iconSpec = validateIcon(icon);
+        String iconExtension = iconSpec.extension();
+
         Path moduleRoot = repoRootPath.resolve(context.getArtifactId()).normalize();
         boolean overwriteExistingModule = request != null && Boolean.TRUE.equals(request.getOverwriteExistingModule());
         if (Files.exists(moduleRoot)) {
@@ -243,16 +237,7 @@ public class ConnectorGeneratorService {
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__packageName__/quick/__classPrefix__QuickApplication.java",
                     templateValues);
 
-            Path testJavaBase = moduleRoot.resolve("src/test/java/com/ovaledge/csp/apps/" + context.getPackageName());
-            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "ConnectorTest.java"),
-                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__packageName__/main/__classPrefix__ConnectorTest.java",
-                    templateValues);
-            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "MetadataServiceTest.java"),
-                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__packageName__/main/__classPrefix__MetadataServiceTest.java",
-                    templateValues);
-            writeTemplateIfAbsentWithInfo(testJavaBase.resolve("main/" + context.getClassPrefix() + "QueryServiceTest.java"),
-                    "archetype-resources/src/test/java/com/ovaledge/csp/apps/__packageName__/main/__classPrefix__QueryServiceTest.java",
-                    templateValues);
+            writeGeneratedUnitTests(moduleRoot, context, templateValues);
 
             Path resourcesBase = moduleRoot.resolve("src/main/resources");
             Path servicesPath = resourcesBase.resolve("META-INF/services");
@@ -274,10 +259,23 @@ public class ConnectorGeneratorService {
             Files.createDirectories(iconsPath);
             Files.write(iconsPath.resolve(context.getArtifactId() + "." + iconExtension), iconSpec.bytes());
 
-            boolean parentModuleAdded = upsertParentModule(parentPomPath, context.getArtifactId());
-            boolean parentDependencyManagementAdded = upsertParentDependencyManagement(parentPomPath, context.getArtifactId());
-            boolean cspApiDependencyAdded = upsertModuleDependency(cspApiPomPath, context.getArtifactId());
-            boolean assemblyDependencyAdded = upsertModuleDependency(assemblyPomPath, context.getArtifactId());
+            boolean parentModuleAdded;
+            boolean parentDependencyManagementAdded;
+            boolean cspApiDependencyAdded;
+            boolean assemblyDependencyAdded;
+            boolean testReportModulesAdded;
+            try {
+                PomWiringResult wiring = applyPomWiring(
+                        parentPomPath, cspApiPomPath, assemblyPomPath, context.getArtifactId());
+                parentModuleAdded = wiring.parentModuleAdded();
+                parentDependencyManagementAdded = wiring.parentDependencyManagementAdded();
+                cspApiDependencyAdded = wiring.cspApiDependencyAdded();
+                assemblyDependencyAdded = wiring.assemblyDependencyAdded();
+                testReportModulesAdded = wiring.testReportModulesAdded();
+            } catch (IOException e) {
+                deleteDirectoryQuietly(moduleRoot);
+                throw new RuntimeException("Failed to wire connector module into pom files", e);
+            }
 
             Map<String, String> response = new LinkedHashMap<>();
             response.put("artifactId", context.getArtifactId());
@@ -287,6 +285,7 @@ public class ConnectorGeneratorService {
             response.put("parentDependencyManagementAdded", String.valueOf(parentDependencyManagementAdded));
             response.put("cspApiDependencyAdded", String.valueOf(cspApiDependencyAdded));
             response.put("assemblyDependencyAdded", String.valueOf(assemblyDependencyAdded));
+            response.put("testReportModulesAdded", String.valueOf(testReportModulesAdded));
             if (!parentDependencyManagementAdded) {
                 response.put("parentDependencyManagementReason",
                         "Dependency already exists in parent pom.xml dependencyManagement.");
@@ -297,20 +296,74 @@ public class ConnectorGeneratorService {
             if (!assemblyDependencyAdded) {
                 response.put("assemblyDependencyReason", "Dependency already exists in assembly/pom.xml.");
             }
+            if (!testReportModulesAdded) {
+                response.put("testReportModulesReason",
+                        "Module already listed in csp.sdk.test.report.modules or property is absent.");
+            }
             return response;
         } catch (IOException e) {
-            // Best-effort cleanup if generation partially succeeded.
             deleteDirectoryQuietly(moduleRoot);
             throw new RuntimeException("Failed to generate connector module", e);
         }
     }
 
-    private boolean upsertParentModule(Path parentPomPath, String artifactId) throws IOException {
-        String pom = Files.readString(parentPomPath, StandardCharsets.UTF_8);
+    private record PomUpsertResult(String content, boolean changed) {}
+
+    private record PomWiringResult(
+            boolean parentModuleAdded,
+            boolean parentDependencyManagementAdded,
+            boolean cspApiDependencyAdded,
+            boolean assemblyDependencyAdded,
+            boolean testReportModulesAdded) {}
+
+    /**
+     * Computes all pom mutations in memory, then flushes them in one pass so partial pom writes cannot
+     * leave the reactor referencing a module that was rolled back.
+     */
+    private PomWiringResult applyPomWiring(
+            Path parentPomPath, Path cspApiPomPath, Path assemblyPomPath, String artifactId) throws IOException {
+        String originalParentPom = Files.readString(parentPomPath, StandardCharsets.UTF_8);
+        String originalCspApiPom = Files.readString(cspApiPomPath, StandardCharsets.UTF_8);
+        String originalAssemblyPom = Files.readString(assemblyPomPath, StandardCharsets.UTF_8);
+
+        String parentPom = originalParentPom;
+        PomUpsertResult parentModule = upsertParentModuleInMemory(parentPom, artifactId);
+        parentPom = parentModule.content();
+        PomUpsertResult parentDependencyManagement = upsertParentDependencyManagementInMemory(parentPom, artifactId);
+        parentPom = parentDependencyManagement.content();
+        PomUpsertResult testReportModules = upsertTestReportModulesInMemory(parentPom, artifactId);
+        parentPom = testReportModules.content();
+
+        PomUpsertResult cspApiDependency = upsertModuleDependencyInMemory(originalCspApiPom, artifactId);
+        PomUpsertResult assemblyDependency = upsertModuleDependencyInMemory(originalAssemblyPom, artifactId);
+
+        Map<Path, String> pendingWrites = new LinkedHashMap<>();
+        if (!parentPom.equals(originalParentPom)) {
+            pendingWrites.put(parentPomPath, parentPom);
+        }
+        if (!cspApiDependency.content().equals(originalCspApiPom)) {
+            pendingWrites.put(cspApiPomPath, cspApiDependency.content());
+        }
+        if (!assemblyDependency.content().equals(originalAssemblyPom)) {
+            pendingWrites.put(assemblyPomPath, assemblyDependency.content());
+        }
+        for (Map.Entry<Path, String> entry : pendingWrites.entrySet()) {
+            Files.writeString(entry.getKey(), entry.getValue(), StandardCharsets.UTF_8);
+        }
+
+        return new PomWiringResult(
+                parentModule.changed(),
+                parentDependencyManagement.changed(),
+                cspApiDependency.changed(),
+                assemblyDependency.changed(),
+                testReportModules.changed());
+    }
+
+    private PomUpsertResult upsertParentModuleInMemory(String pom, String artifactId) throws IOException {
         String marker = firstMarkerPresent(pom, MODULE_MARKER_NEW);
         String moduleLine = "    <module>" + artifactId + "</module>";
         if (pom.contains("<module>" + artifactId + "</module>")) {
-            return false;
+            return new PomUpsertResult(pom, false);
         }
         String updated;
         if (marker != null) {
@@ -323,8 +376,7 @@ public class ConnectorGeneratorService {
                     moduleLine + "\n",
                     "parent pom.xml modules section");
         }
-        Files.writeString(parentPomPath, updated, StandardCharsets.UTF_8);
-        return true;
+        return new PomUpsertResult(updated, true);
     }
 
     private void deleteModuleDirectoryForOverwrite(Path repoRootPath, Path moduleRoot) throws IOException {
@@ -355,8 +407,7 @@ public class ConnectorGeneratorService {
         });
     }
 
-    private boolean upsertParentDependencyManagement(Path parentPomPath, String artifactId) throws IOException {
-        String pom = Files.readString(parentPomPath, StandardCharsets.UTF_8);
+    private PomUpsertResult upsertParentDependencyManagementInMemory(String pom, String artifactId) throws IOException {
         String marker = firstMarkerPresent(pom, DEP_MARKER_NEW);
         String depSnippet = "      <dependency>\n"
                 + "        <groupId>com.ovaledge</groupId>\n"
@@ -364,7 +415,7 @@ public class ConnectorGeneratorService {
                 + "        <version>${project.version}</version>\n"
                 + "      </dependency>";
         if (pom.contains("<artifactId>" + artifactId + "</artifactId>")) {
-            return false;
+            return new PomUpsertResult(pom, false);
         }
         String updated;
         if (marker != null) {
@@ -377,19 +428,17 @@ public class ConnectorGeneratorService {
                     depSnippet + "\n",
                     "parent pom.xml dependencyManagement section");
         }
-        Files.writeString(parentPomPath, updated, StandardCharsets.UTF_8);
-        return true;
+        return new PomUpsertResult(updated, true);
     }
 
-    private boolean upsertModuleDependency(Path pomPath, String artifactId) throws IOException {
-        String pom = Files.readString(pomPath, StandardCharsets.UTF_8);
+    private PomUpsertResult upsertModuleDependencyInMemory(String pom, String artifactId) throws IOException {
         String marker = firstMarkerPresent(pom, DEP_MARKER_NEW);
         String depSnippet = "        <dependency>\n"
                 + "            <groupId>com.ovaledge</groupId>\n"
                 + "            <artifactId>" + artifactId + "</artifactId>\n"
                 + "        </dependency>";
         if (pom.contains("<artifactId>" + artifactId + "</artifactId>")) {
-            return false;
+            return new PomUpsertResult(pom, false);
         }
         String updated;
         if (marker != null) {
@@ -400,10 +449,58 @@ public class ConnectorGeneratorService {
                     "<dependencies>",
                     "</dependencies>",
                     depSnippet + "\n",
-                    pomPath + " dependencies section");
+                    "module pom.xml dependencies section",
+                    "<!-- Test dependencies");
         }
-        Files.writeString(pomPath, updated, StandardCharsets.UTF_8);
-        return true;
+        return new PomUpsertResult(updated, true);
+    }
+
+    /**
+     * No-op when {@code csp.sdk.test.report.modules} is absent.
+     */
+    private PomUpsertResult upsertTestReportModulesInMemory(String pom, String artifactId) throws IOException {
+        int propertyStart = pom.indexOf(TEST_REPORT_MODULES_OPEN);
+        if (propertyStart < 0) {
+            return new PomUpsertResult(pom, false);
+        }
+        int valueStart = propertyStart + TEST_REPORT_MODULES_OPEN.length();
+        int propertyEnd = pom.indexOf(TEST_REPORT_MODULES_CLOSE, valueStart);
+        if (propertyEnd < 0) {
+            throw new IOException("Malformed parent pom.xml: unclosed csp.sdk.test.report.modules property.");
+        }
+        String rawValue = pom.substring(valueStart, propertyEnd);
+        String trimmedValue = rawValue.trim();
+        if (containsCommaSeparatedToken(trimmedValue, artifactId)) {
+            return new PomUpsertResult(pom, false);
+        }
+        String updatedInner = trimmedValue.isEmpty() ? artifactId : trimmedValue + "," + artifactId;
+        int leadingWhitespaceEnd = 0;
+        while (leadingWhitespaceEnd < rawValue.length()
+                && Character.isWhitespace(rawValue.charAt(leadingWhitespaceEnd))) {
+            leadingWhitespaceEnd++;
+        }
+        int trailingWhitespaceStart = rawValue.length();
+        while (trailingWhitespaceStart > leadingWhitespaceEnd
+                && Character.isWhitespace(rawValue.charAt(trailingWhitespaceStart - 1))) {
+            trailingWhitespaceStart--;
+        }
+        String prefix = rawValue.substring(0, leadingWhitespaceEnd);
+        String suffix = rawValue.substring(trailingWhitespaceStart);
+        String updatedValue = prefix + updatedInner + suffix;
+        String updated = pom.substring(0, valueStart) + updatedValue + pom.substring(propertyEnd);
+        return new PomUpsertResult(updated, true);
+    }
+
+    private boolean containsCommaSeparatedToken(String csv, String token) {
+        if (csv == null || csv.isBlank()) {
+            return false;
+        }
+        for (String part : csv.split(",")) {
+            if (token.equals(part.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String firstMarkerPresent(String content, String... markers) {
@@ -421,15 +518,57 @@ public class ConnectorGeneratorService {
             String sectionCloseTag,
             String snippetWithTrailingNewline,
             String sectionLabel) throws IOException {
+        return insertBeforeClosingTagInSection(
+                xml, sectionOpenTag, sectionCloseTag, snippetWithTrailingNewline, sectionLabel, null);
+    }
+
+    /**
+     * Inserts before {@code sectionCloseTag} inside {@code sectionOpenTag}. When {@code stopBeforeMarker}
+     * is set, closes at the first occurrence of that text after the open tag (e.g. assembly test deps).
+     */
+    private String insertBeforeClosingTagInSection(
+            String xml,
+            String sectionOpenTag,
+            String sectionCloseTag,
+            String snippetWithTrailingNewline,
+            String sectionLabel,
+            String stopBeforeMarker) throws IOException {
         int sectionStart = xml.indexOf(sectionOpenTag);
         if (sectionStart < 0) {
             throw new IOException("Unable to locate " + sectionLabel + " (missing " + sectionOpenTag + ").");
         }
-        int sectionEnd = xml.indexOf(sectionCloseTag, sectionStart);
+        int sectionEnd;
+        if (stopBeforeMarker != null) {
+            int markerIndex = xml.indexOf(stopBeforeMarker, sectionStart);
+            if (markerIndex >= 0) {
+                sectionEnd = findLastCloseTagBefore(xml, sectionCloseTag, sectionStart, markerIndex);
+                if (sectionEnd < 0) {
+                    sectionEnd = markerIndex;
+                }
+            } else {
+                sectionEnd = xml.indexOf(sectionCloseTag, sectionStart);
+            }
+        } else {
+            sectionEnd = xml.indexOf(sectionCloseTag, sectionStart);
+        }
         if (sectionEnd < 0) {
             throw new IOException("Unable to locate " + sectionLabel + " (missing " + sectionCloseTag + ").");
         }
         return xml.substring(0, sectionEnd) + snippetWithTrailingNewline + xml.substring(sectionEnd);
+    }
+
+    private int findLastCloseTagBefore(String xml, String closeTag, int sectionStart, int beforeIndex) {
+        int last = -1;
+        int searchFrom = sectionStart;
+        while (true) {
+            int idx = xml.indexOf(closeTag, searchFrom);
+            if (idx < 0 || idx >= beforeIndex) {
+                break;
+            }
+            last = idx;
+            searchFrom = idx + closeTag.length();
+        }
+        return last;
     }
 
     /**
@@ -437,10 +576,15 @@ public class ConnectorGeneratorService {
      *
      * <p>Rejects connector names on the legacy txt list or already used by an in-repo SDK module.
      */
-    private ConnectorGenerationContext validateAndNormalize(ConnectorGeneratorRequest request) {
+    private ConnectorGenerationContext validateAndNormalize(ConnectorGeneratorRequest request, Path repoRootPath) {
         List<String> errors = new ArrayList<>();
         String connectorName = request != null ? request.getConnectorName() : null;
-        Path repoRootPath = resolveRepoRootPath(request != null ? request.getRepoRoot() : null);
+
+        if (repoRootPath == null || !Files.exists(repoRootPath) || !Files.isDirectory(repoRootPath)) {
+            errors.add("Repository root path does not exist or is not a directory: " + repoRootPath);
+        } else if (!Files.isRegularFile(repoRootPath.resolve("pom.xml"))) {
+            errors.add("Missing required file: " + repoRootPath.resolve("pom.xml"));
+        }
 
         if (connectorName == null || connectorName.trim().isEmpty()) {
             errors.add("Connector Name is required.");
@@ -468,22 +612,31 @@ public class ConnectorGeneratorService {
             errors.add("Connector Name must start with a letter for a valid class name.");
         }
 
-        if (!artifactId.isEmpty() && LegacyPlatformServerTypes.isBlockedForNewConnector(artifactId, repoRootPath)) {
+        if (!artifactId.isEmpty() && errors.isEmpty()
+                && LegacyPlatformServerTypes.isBlockedForNewConnector(artifactId, repoRootPath)) {
             errors.add(LegacyPlatformServerTypes.generatorBlockedMessage(artifactId, repoRootPath));
         }
 
         List<ObjectKind> objectKinds = parseObjectKinds(objectKindInputs, errors);
         validateManifestAndReferences(request, errors);
 
-        if (!errors.isEmpty()) {
-            throw new ConnectorGeneratorValidationException(errors);
-        }
-
-        String primaryObjectOverride = request.getManifest() != null
+        String primaryObjectOverride = request != null
+                && request.getManifest() != null
                 && request.getManifest().getConnectorMaster() != null
                 ? request.getManifest().getConnectorMaster().getPrimaryObject()
                 : null;
-        String primaryObject = PrimaryObjectResolver.resolve(objectKinds, primaryObjectOverride);
+        String primaryObject = null;
+        if (errors.isEmpty()) {
+            try {
+                primaryObject = PrimaryObjectResolver.resolve(objectKinds, primaryObjectOverride);
+            } catch (IllegalArgumentException ex) {
+                errors.add(ex.getMessage());
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new ConnectorGeneratorValidationException(errors);
+        }
 
         return new ConnectorGenerationContext(connectorName.trim(), artifactId, packageName,
                 classPrefix, artifactId, objectKinds, primaryObject);
@@ -658,26 +811,46 @@ public class ConnectorGeneratorService {
      */
     public static Path resolveRepoRootPath(String repoRoot) {
         if (repoRoot == null || repoRoot.trim().isEmpty()) {
-            Path cwd = Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
-            if (Files.isRegularFile(cwd.resolve("pom.xml"))) {
-                return cwd;
-            }
-            Path parent = cwd.getParent();
-            if (parent != null && Files.isRegularFile(parent.resolve("pom.xml"))) {
-                return parent.normalize();
-            }
-            return cwd;
+            return inferReactorRootFromWorkingDirectory();
         }
         try {
             Path raw = Paths.get(repoRoot.trim());
-            if (raw.isAbsolute()) {
-                return raw.normalize();
+            Path resolved = raw.isAbsolute()
+                    ? raw.normalize()
+                    : Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize().resolve(raw).normalize();
+            if (looksLikeCspReactorRoot(resolved)) {
+                return resolved;
             }
-            Path base = Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
-            return base.resolve(raw).normalize();
+            Path inferred = inferReactorRootFrom(resolved);
+            return inferred != null ? inferred : resolved;
         } catch (InvalidPathException ex) {
-            return Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
+            return inferReactorRootFromWorkingDirectory();
         }
+    }
+
+    private static Path inferReactorRootFromWorkingDirectory() {
+        Path inferred = inferReactorRootFrom(
+                Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize());
+        return inferred != null
+                ? inferred
+                : Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
+    }
+
+    private static Path inferReactorRootFrom(Path start) {
+        Path candidate = start;
+        while (candidate != null) {
+            if (looksLikeCspReactorRoot(candidate)) {
+                return candidate.normalize();
+            }
+            candidate = candidate.getParent();
+        }
+        return null;
+    }
+
+    private static boolean looksLikeCspReactorRoot(Path dir) {
+        return Files.isRegularFile(dir.resolve("pom.xml"))
+                && Files.isRegularFile(dir.resolve("csp-api/pom.xml"))
+                && Files.isRegularFile(dir.resolve("assembly/pom.xml"));
     }
 
     /**
@@ -996,6 +1169,39 @@ public class ConnectorGeneratorService {
 
     private boolean boolOrDefault(Boolean v, boolean d) {
         return v != null ? v : d;
+    }
+
+    private void writeGeneratedUnitTests(
+            Path moduleRoot, ConnectorGenerationContext context, Map<String, String> templateValues)
+            throws IOException {
+        Path unitTestBase =
+                moduleRoot.resolve("src/test/java/com/ovaledge/csp/tests/unit/connector/" + context.getPackageName());
+        writeTemplateIfAbsentWithInfo(
+                unitTestBase.resolve(context.getClassPrefix() + "ConnectorUnitTest.java"),
+                "archetype-resources/src/test/java/com/ovaledge/csp/tests/unit/connector/__packageName__/__classPrefix__ConnectorUnitTest.java",
+                templateValues);
+        writeTemplateIfAbsentWithInfo(
+                unitTestBase.resolve(context.getClassPrefix() + "MetadataServiceUnitTest.java"),
+                "archetype-resources/src/test/java/com/ovaledge/csp/tests/unit/connector/__packageName__/__classPrefix__MetadataServiceUnitTest.java",
+                templateValues);
+        writeTemplateIfAbsentWithInfo(
+                unitTestBase.resolve(context.getClassPrefix() + "QueryServiceUnitTest.java"),
+                "archetype-resources/src/test/java/com/ovaledge/csp/tests/unit/connector/__packageName__/__classPrefix__QueryServiceUnitTest.java",
+                templateValues);
+
+        Path testRoot = moduleRoot.resolve("src/test/java/com/ovaledge/csp/tests");
+        writeTemplateIfAbsentWithInfo(
+                testRoot.resolve("unit/package-info.java"),
+                "archetype-resources/src/test/java/com/ovaledge/csp/tests/unit/package-info.java",
+                templateValues);
+        writeTemplateIfAbsentWithInfo(
+                testRoot.resolve("integration/package-info.java"),
+                "archetype-resources/src/test/java/com/ovaledge/csp/tests/integration/package-info.java",
+                templateValues);
+        writeTemplateIfAbsentWithInfo(
+                testRoot.resolve("deprecated/package-info.java"),
+                "archetype-resources/src/test/java/com/ovaledge/csp/tests/deprecated/package-info.java",
+                templateValues);
     }
 
     private void writeTemplate(Path path, String templateName, Map<String, String> values) throws IOException {

@@ -1,7 +1,9 @@
 package com.ovaledge.csp.validation;
 
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,7 +24,7 @@ import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
  * Discovers SDK connector {@code serverType} values from the multi-module repository layout.
  *
  * <p>Used by {@link LegacyPlatformServerTypes} (generator/UI blocking) and by the assembly build test
- * {@code LegacyServerTypeForbiddenTest} so both paths share one implementation. The scanner:
+ * {@code CspSdkServerTypeValidator} so both paths share one implementation. The scanner:
  * <ul>
  *   <li>Reads {@code &lt;module&gt;} entries from the root {@code pom.xml} via Maven Model API</li>
  *   <li>For each module with an {@code AppsConnector} SPI file, collects config basenames
@@ -140,7 +142,10 @@ public final class SdkConnectorReactorScanner {
 
     /**
      * Reports a legacy-platform txt conflict for this module when the type is forbidden, not yet owned by
-     * another module, and the module directory name does not match the server type (cannot claim the name).
+     * another module, and this module cannot claim the name (folder name vs server type).
+     *
+     * <p>Claim is allowed when the normalized module name equals the server type, or when the runtime id
+     * extends the module id (e.g. module {@code quickbooks}, serverType {@code quickbooks-online}).
      */
     private static boolean isLegacyViolationForModule(
             String moduleName, String serverType, Set<String> ownedBeforeModule) {
@@ -151,7 +156,24 @@ public final class SdkConnectorReactorScanner {
         if (ownedBeforeModule.contains(normalizedType)) {
             return false;
         }
-        return !ServerTypeNormalizer.normalize(moduleName).equals(normalizedType);
+        String normalizedModule = ServerTypeNormalizer.normalize(moduleName);
+        if (normalizedModule.equals(normalizedType)) {
+            return false;
+        }
+        if (canClaimLegacyTypeByModulePrefix(normalizedModule, normalizedType)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Module {@code quickbooks} may own legacy {@code quickbooks-online}; require a substantive module
+     * prefix so short names (e.g. {@code quick}) cannot claim unrelated legacy types.
+     */
+    private static boolean canClaimLegacyTypeByModulePrefix(String normalizedModule, String normalizedType) {
+        final int minModulePrefixLength = 8;
+        return normalizedModule.length() >= minModulePrefixLength
+                && normalizedType.startsWith(normalizedModule);
     }
 
     /** Records which reactor module(s) declare a given canonical server type. */
@@ -212,8 +234,9 @@ public final class SdkConnectorReactorScanner {
     /** Reads {@code &lt;module&gt;} paths from the aggregator POM at {@code rootPom}. */
     private static List<String> readModules(Path rootPom) throws Exception {
         MavenXpp3Reader reader = new MavenXpp3Reader();
-        try (FileReader fr = new FileReader(rootPom.toFile())) {
-            Model model = reader.read(fr);
+        try (InputStreamReader input = new InputStreamReader(
+                new FileInputStream(rootPom.toFile()), StandardCharsets.UTF_8)) {
+            Model model = reader.read(input);
             return model.getModules() == null ? List.of() : model.getModules();
         }
     }

@@ -26,14 +26,23 @@ Generate comprehensive unit tests for connector implementations following SDK pa
 
 ## Test File Locations
 
-Tests should be placed in the connector module's test directory:
+Tests follow the SDK layout under `com.ovaledge.csp.tests`:
 
 ```
-{connector-id}/src/test/java/com/ovaledge/csp/apps/{package}/main/
-├── {Prefix}ConnectorTest.java
-├── {Prefix}MetadataServiceTest.java
-└── {Prefix}QueryServiceTest.java
+{connector-id}/src/test/java/com/ovaledge/csp/tests/
+├── unit/
+│   ├── package-info.java
+│   └── connector/{package}/
+│       ├── {Prefix}ConnectorUnitTest.java
+│       ├── {Prefix}MetadataServiceUnitTest.java
+│       └── {Prefix}QueryServiceUnitTest.java
+├── integration/
+│   └── package-info.java
+└── deprecated/
+    └── package-info.java
 ```
+
+Generated connectors scaffold unit tests only; add integration tests under `integration/` when needed. Run with `mvn -pl {connector-id} -Punit-tests test`.
 
 ---
 
@@ -55,7 +64,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 ## Required Test Categories
 
-### 1. ConnectorTest — `{Prefix}ConnectorTest.java`
+### 1. ConnectorUnitTest — `{Prefix}ConnectorUnitTest.java`
 
 Must test all `AppsConnector` contract methods:
 
@@ -76,7 +85,7 @@ Must test all `AppsConnector` contract methods:
 
 ```java
 @ExtendWith(MockitoExtension.class)
-class ZohodeskConnectorTest {
+class ZohodeskConnectorUnitTest {
 
     private ZohodeskConnector connector;
 
@@ -128,7 +137,7 @@ class ZohodeskConnectorTest {
 
 ---
 
-### 2. MetadataServiceTest — `{Prefix}MetadataServiceTest.java`
+### 2. MetadataServiceUnitTest — `{Prefix}MetadataServiceUnitTest.java`
 
 Must test all `MetadataService` contract methods:
 
@@ -168,7 +177,7 @@ void inferType_mapsPrimitiveAndCompositeValues() {
 
 ---
 
-### 3. QueryServiceTest — `{Prefix}QueryServiceTest.java`
+### 3. QueryServiceUnitTest — `{Prefix}QueryServiceUnitTest.java`
 
 Must test `QueryService.fetchData()`:
 
@@ -186,7 +195,7 @@ Must test `QueryService.fetchData()`:
 
 ```java
 @ExtendWith(MockitoExtension.class)
-class ZohodeskQueryServiceTest {
+class ZohodeskQueryServiceUnitTest {
 
     private ZohodeskQueryService queryService;
 
@@ -264,10 +273,12 @@ Examples:
 From repo root, these may fail if `serverType` or `@SdkConnector` metadata is wrong:
 
 ```bash
-mvn test -pl assembly -Dtest=LegacyServerTypeForbiddenTest
+mvn -pl assembly package
 ```
 
-See **connector-debugging** (Category 6: `LegacyServerTypeForbiddenTest fails`) for fixes.
+The `CspSdkServerTypeValidator` Mojo runs at `process-classes` during assembly package. Skip with `-Dskip.csp.sdk.server.type.validation=true` only when debugging locally.
+
+See **connector-debugging** (Category 6: `CspSdkServerTypeValidator fails`) for fixes.
 
 ---
 
@@ -292,13 +303,13 @@ Before PR submission, tests must:
    - What entities/containers exist
    - What helper methods need testing
 
-2. **Generate ConnectorTest first** — covers the entry point and attribute handling
+2. **Generate ConnectorUnitTest first** — covers the entry point and attribute handling
 
-3. **Generate MetadataServiceTest** — covers discovery flow
+3. **Generate MetadataServiceUnitTest** — covers discovery flow
 
-4. **Generate QueryServiceTest** — covers data fetch flow
+4. **Generate QueryServiceUnitTest** — covers data fetch flow
 
-5. **Run tests** to verify: `mvn test -pl {connector-id}`
+5. **Run tests** to verify: `mvn -pl {connector-id} -Punit-tests test`
 
 6. **Check coverage** of edge cases from the checklist above
 
@@ -317,7 +328,7 @@ The connector archetype generates skeleton tests with TODOs. When expanding thes
 
 ## Example: Complete Test Suite for a REST Connector
 
-See `zohodesk/src/test/java/com/ovaledge/csp/apps/zohodesk/main/` for a complete reference implementation with:
+See `zohodesk/src/test/java/com/ovaledge/csp/tests/unit/connector/zohodesk/` for a complete reference implementation with:
 
 - Connector tests with round-trip attribute exchange
 - MetadataService tests with subtype resolution and type inference
@@ -327,4 +338,4 @@ See `zohodesk/src/test/java/com/ovaledge/csp/apps/zohodesk/main/` for a complete
 
 - **connector-code-review** — Phase 7 test expectations before PR
 - **build-new-connector-sdk** — contracts tests must enforce
-- **connector-debugging** — when `mvn test -pl {connector-id}` or `LegacyServerTypeForbiddenTest` fails
+- **connector-debugging** — when `mvn test -pl {connector-id}` or `CspSdkServerTypeValidator` (assembly package) fails

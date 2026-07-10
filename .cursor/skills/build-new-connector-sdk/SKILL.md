@@ -113,7 +113,7 @@ Create a new Maven module under `oe_csp_sdk` with this structure:
 
 - Extend `BaseAppConnector`, implement `AppsConnector`.
 - Annotate with `@SdkConnector(artifactId = "{connector-id}")` (must match Maven `artifactId` and `src/main/resources/configs/{connector-id}.json` basename). Required for release metadata and reactor validation.
-- Return unique `getServerType()` = `{SERVER_TYPE}` (e.g. `monetdb`, `tally`). Must match the `server` field in `configs/{connector-id}.json` and stay stable across releases (see `LegacyServerTypeForbiddenTest`).
+- Return unique `getServerType()` = `{SERVER_TYPE}` (e.g. `monetdb`, `tally`). Must match the `server` field in `configs/{connector-id}.json` and stay stable across releases (validated by `CspSdkServerTypeValidator` during `mvn -pl assembly package`).
 - Implement:
   - `validateConnection(ConnectionConfig config)` — test credentials/connectivity; return `ValidateConnectionResponse` (success/valid/message). Use `config` **as-is** (do not build or complete ConnectionConfig from attributes; the caller provides it). For OAuth2, support code exchange and “auth required” with URL.
   - `getMetadataService()` — return your `{Prefix}MetadataService`.

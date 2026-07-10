@@ -92,7 +92,7 @@ public final class ServerTypeNormalizer {
      * versioned alternate (full name or stem is in {@code blockedNames}). Prevents treating legitimate
      * ids such as {@code archivev2} as versioned when they are not blocked.
      */
-    static String stripTrailingVersionSuffix(String normalizedServerType, Set<String> blockedNames) {
+    public static String stripTrailingVersionSuffix(String normalizedServerType, Set<String> blockedNames) {
         if (normalizedServerType == null || normalizedServerType.isEmpty()) {
             return "";
         }

@@ -24,6 +24,10 @@ target/
 dist/
 dependency-reduced-pom.xml
 
+# Allure CLI / local report tooling (downloaded under module or repo root)
+.allure/
+**/.allure/
+
 # JetBrains IDE
 .idea/
 
