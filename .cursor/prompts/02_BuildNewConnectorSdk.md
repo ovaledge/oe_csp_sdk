@@ -72,7 +72,7 @@ Create a new Maven module under `oe_csp_sdk` with this structure:
         └── {connector-id}.png            icon (e.g. monetdb.png)
 ```
 
-**Naming:** `{connector-id}` = artifactId, lowercase, hyphenated (e.g. `monetdb`, `tally`). `{package}` = connector-id with hyphens removed. `{Prefix}` = PascalCase (e.g. `MonetDB`, `Tally`).
+**Naming:** `{connector-id}` = artifactId, lowercase (e.g. `monetdb`, `tally`). `{package}` = connector-id with hyphens removed. `{Prefix}` = PascalCase (e.g. `MonetDB`, `Tally`).
 
 ---
 

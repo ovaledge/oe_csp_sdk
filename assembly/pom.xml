@@ -37,44 +37,52 @@
         </dependency>
 <!-- Connector generator marker (dependencies): DO NOT REMOVE. New connector dependencies are inserted above this line. -->
 
-        <!-- Test dependencies for git test -->
-        <dependency>
-            <groupId>org.eclipse.jgit</groupId>
-            <artifactId>org.eclipse.jgit</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!--
-          Test-scoped: parses POMs in assembly tests (e.g. CspSdkGitTest). SdkConnectorReactorScanner uses
-          maven-model from the compile classpath of the test-scoped csp-api dependency below.
-        -->
-        <dependency>
-            <groupId>org.apache.maven</groupId>
-            <artifactId>maven-model</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!--
-          Test-scoped compile dependency on csp-api so assembly tests can call SdkConnectorReactorScanner
-          and LegacyPlatformServerTypes without duplicating scanner logic. LegacyServerTypeForbiddenTest
-          delegates to the same scanner used by the Connector Generator. Build csp-api before assembly
-          (e.g. mvn -pl assembly -am) so this dependency resolves to a current csp-api jar.
-        -->
+        <!-- Compile dependency on csp-api for CspSdkServerTypeValidator and SdkConnectorReactorScanner. -->
         <dependency>
             <groupId>com.ovaledge</groupId>
             <artifactId>csp-api</artifactId>
             <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+        </dependency>
+
+        <!-- Maven Plugin API dependencies for CspSdkGitInfoGenerator Mojo -->
+        <dependency>
+            <groupId>org.apache.maven.plugin-tools</groupId>
+            <artifactId>maven-plugin-annotations</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-plugin-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-model</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-junit5</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -86,43 +94,59 @@
             <testResource>
                 <directory>src/test/resources</directory>
             </testResource>
-            <!--
-              Copies legacy-platform-server-types.txt from csp-api into assembly test classpath so any test
-              that reads the txt list matches production. Dynamic in-repo ownership is not copied from a file;
-              LegacyServerTypeForbiddenTest uses SdkConnectorReactorScanner from the test-scoped csp-api jar.
-            -->
-            <testResource>
-                <directory>${project.basedir}/../csp-api/src/main/resources</directory>
-                <includes>
-                    <include>legacy-platform-server-types.txt</include>
-                </includes>
-            </testResource>
         </testResources>
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
                 <executions>
                     <execution>
-                        <id>default-test</id>
-                        <phase>test</phase>
+                        <id>validate-csp-sdk-server-types</id>
+                        <phase>process-classes</phase>
                         <goals>
-                            <goal>test</goal>
+                            <goal>java</goal>
                         </goals>
                         <configuration>
-                            <skipTests>false</skipTests>
-                            <includes>
-                                <include>**/validation/CspSdkGitTest.java</include>
-                                <include>**/validation/LegacyServerTypeForbiddenTest.java</include>
-                            </includes>
-                            <excludes>
-                                <exclude>**/unit/**/*Test.java</exclude>
-                                <exclude>**/integration/**/*Test.java</exclude>
-                                <exclude>**/e2e/**/*Test.java</exclude>
-                            </excludes>
+                            <mainClass>com.ovaledge.csp.validation.CspSdkServerTypeValidator</mainClass>
+                            <classpathScope>compile</classpathScope>
+                            <systemProperties>
+                                <systemProperty>
+                                    <key>project.basedir</key>
+                                    <value>${project.basedir}</value>
+                                </systemProperty>
+                            </systemProperties>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate-csp-sdk-git-info</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.ovaledge.csp.validation.CspSdkGitInfoGenerator</mainClass>
+                            <classpathScope>compile</classpathScope>
+                            <systemProperties>
+                                <systemProperty>
+                                    <key>project.basedir</key>
+                                    <value>${project.basedir}</value>
+                                </systemProperty>
+                                <systemProperty>
+                                    <key>project.build.directory</key>
+                                    <value>${project.build.directory}</value>
+                                </systemProperty>
+                            </systemProperties>
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-surefire-plugin</artifactId>
+              <configuration>
+                <skipTests>${csp.sdk.build.skip.tests}</skipTests>
+                <useModulePath>false</useModulePath>
+              </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -261,4 +285,141 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+    <profile>
+      <id>unit-tests</id>
+      <properties>
+        <csp.sdk.build.skip.tests>false</csp.sdk.build.skip.tests>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <includes>
+                <include>**/tests/unit/**/*Test.java</include>
+                <include>**/tests/unit/**/*Tests.java</include>
+              </includes>
+              <excludes>
+                <exclude>**/tests/e2e/**/*Test.java</exclude>
+                <exclude>**/tests/integration/**/*Test.java</exclude>
+              </excludes>
+              <systemPropertyVariables>
+                <testcontainers.disabled>true</testcontainers.disabled>
+                <allure.results.directory>${project.build.directory}/allure-results</allure.results.directory>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>integration-tests</id>
+      <properties>
+        <csp.sdk.build.skip.tests>false</csp.sdk.build.skip.tests>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <includes>
+                <include>**/tests/integration/**/*Test.java</include>
+                <include>**/tests/integration/**/*Tests.java</include>
+              </includes>
+              <excludes>
+                <exclude>**/tests/e2e/**/*Test.java</exclude>
+                <exclude>**/tests/unit/**/*Test.java</exclude>
+              </excludes>
+              <systemPropertyVariables>
+                <testcontainers.disabled>false</testcontainers.disabled>
+                <jdbc.drivers></jdbc.drivers>
+                <allure.results.directory>${project.build.directory}/allure-results</allure.results.directory>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>unit-and-integration-tests</id>
+      <properties>
+        <csp.sdk.build.skip.tests>false</csp.sdk.build.skip.tests>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <includes>
+                <include>**/tests/unit/**/*Test.java</include>
+                <include>**/tests/unit/**/*Tests.java</include>
+                <include>**/tests/integration/**/*Test.java</include>
+                <include>**/tests/integration/**/*Tests.java</include>
+              </includes>
+              <excludes>
+                <exclude>**/tests/e2e/**/*Test.java</exclude>
+              </excludes>
+              <systemPropertyVariables>
+                <testcontainers.disabled>false</testcontainers.disabled>
+                <jdbc.drivers></jdbc.drivers>
+                <allure.results.directory>${project.build.directory}/allure-results</allure.results.directory>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>prepare-agent</id>
+                <goals><goal>prepare-agent</goal></goals>
+              </execution>
+              <execution>
+                <id>report</id>
+                <phase>test</phase>
+                <goals><goal>report</goal></goals>
+                <configuration>
+                  <outputDirectory>${project.build.directory}/site/jacoco</outputDirectory>
+                  <dataFile>${project.build.directory}/jacoco.exec</dataFile>
+                </configuration>
+              </execution>
+            </executions>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco.exec</destFile>
+              <dataFile>${project.build.directory}/jacoco.exec</dataFile>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-report-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>generate-report</id>
+                <phase>test</phase>
+                <goals><goal>report-only</goal></goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-maven</artifactId>
+            <executions>
+              <execution>
+                <id>allure-report</id>
+                <phase>verify</phase>
+                <goals><goal>report</goal></goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    </profiles>
 </project>

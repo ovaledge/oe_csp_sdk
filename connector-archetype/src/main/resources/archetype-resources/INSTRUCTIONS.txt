@@ -29,3 +29,10 @@ Supported objects: ${classPrefix}MetadataService.getSupportedObjects() was scaff
 Connector Objects selection (see GENERATOR:START/END markers in that file). Refine display names,
 split subtypes when one ObjectKind maps to several source types (e.g. tables vs views), then
 implement getContainers, getObjects, and getFields for each kind.
+
+Unit test templates (expand TODOs before PR):
+  src/test/java/com/ovaledge/csp/tests/unit/connector/${packageName}/
+    ${classPrefix}ConnectorUnitTest.java
+    ${classPrefix}MetadataServiceUnitTest.java
+    ${classPrefix}QueryServiceUnitTest.java
+Integration and deprecated test folders are scaffolded with package-info.java for future use.

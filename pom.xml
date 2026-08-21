@@ -16,6 +16,9 @@
 <!-- Connector generator marker (modules): DO NOT REMOVE. New connector modules are inserted above this line. -->
   </modules>
   <properties>
+    <csp.sdk.build.skip.tests>true</csp.sdk.build.skip.tests>
+    <csp.sdk.consolidated.reports.dir>${session.executionRootDirectory}/target/consolidated-reports</csp.sdk.consolidated.reports.dir>
+    <csp.sdk.test.report.modules>assembly,csp-api,connector-archetype,monetdb,awsconsole,zohodesk</csp.sdk.test.report.modules>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <java.version>21</java.version>
     <maven.compiler.source>21</maven.compiler.source>
@@ -39,6 +42,14 @@
     <mockito-core.version>5.20.0</mockito-core.version>
     <mockito-inline.version>5.2.0</mockito-inline.version>
     <aws-sdk.version>2.30.2</aws-sdk.version>
+    <allure-junit5.version>2.33.0</allure-junit5.version>
+    <allure-maven.version>2.17.0</allure-maven.version>
+    <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
+    <exec-maven-plugin.version>3.0.0</exec-maven-plugin.version>
+    <maven-surefire-report-plugin.version>3.5.4</maven-surefire-report-plugin.version>
+    <maven-plugin-annotations.version>3.15.2</maven-plugin-annotations.version>
+    <maven-plugin-api.version>3.9.14</maven-plugin-api.version>
+    <maven-core.version>3.8.8</maven-core.version>
   </properties>
   <repositories>
     <repository>
@@ -171,6 +182,31 @@
         <artifactId>mockito-inline</artifactId>
         <version>${mockito-inline.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>${junit-jupiter.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.qameta.allure</groupId>
+        <artifactId>allure-junit5</artifactId>
+        <version>${allure-junit5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven.plugin-tools</groupId>
+        <artifactId>maven-plugin-annotations</artifactId>
+        <version>${maven-plugin-annotations.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-plugin-api</artifactId>
+        <version>${maven-plugin-api.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.maven</groupId>
+        <artifactId>maven-core</artifactId>
+        <version>${maven-core.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>
@@ -207,6 +243,26 @@
           <artifactId>spring-boot-maven-plugin</artifactId>
           <version>${spring-boot.version}</version>
         </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-report-plugin</artifactId>
+          <version>${maven-surefire-report-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>io.qameta.allure</groupId>
+          <artifactId>allure-maven</artifactId>
+          <version>${allure-maven.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <version>${exec-maven-plugin.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
@@ -235,4 +291,12 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>unit-and-integration-tests</id>
+      <properties>
+        <csp.sdk.build.skip.tests>false</csp.sdk.build.skip.tests>
+      </properties>
+    </profile>
+  </profiles>
 </project>

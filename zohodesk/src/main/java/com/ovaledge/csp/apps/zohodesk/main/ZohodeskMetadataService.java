@@ -173,7 +173,7 @@ public class ZohodeskMetadataService implements MetadataService {
         }
     }
 
-    static String resolveSubtype(List<Map<String, String>> filters, String defaultSubtype) {
+    public static String resolveSubtype(List<Map<String, String>> filters, String defaultSubtype) {
         if (filters == null) {
             return defaultSubtype;
         }
@@ -193,7 +193,7 @@ public class ZohodeskMetadataService implements MetadataService {
         return defaultSubtype;
     }
 
-    static String mapDisplayNameToSubtype(String displayName) {
+    public static String mapDisplayNameToSubtype(String displayName) {
         if (displayName == null) return ZohodeskConstants.OBJECT_SUBTYPE_TICKETS;
         String value = displayName.trim().toLowerCase();
         if (value.equals("contacts")) return ZohodeskConstants.OBJECT_SUBTYPE_CONTACTS;
@@ -204,7 +204,7 @@ public class ZohodeskMetadataService implements MetadataService {
         return ZohodeskConstants.OBJECT_SUBTYPE_TICKETS;
     }
 
-    static String subtypeFromEntityId(String entityId) {
+    public static String subtypeFromEntityId(String entityId) {
         if (entityId == null || entityId.isBlank()) return ZohodeskConstants.OBJECT_SUBTYPE_TICKETS;
         String value = entityId.toLowerCase();
         if (value.contains("contact")) return ZohodeskConstants.OBJECT_SUBTYPE_CONTACTS;
@@ -215,7 +215,7 @@ public class ZohodeskMetadataService implements MetadataService {
         return ZohodeskConstants.OBJECT_SUBTYPE_TICKETS;
     }
 
-    static String endpointForSubtype(String subtype) {
+    public static String endpointForSubtype(String subtype) {
         if (ZohodeskConstants.OBJECT_SUBTYPE_CONTACTS.equalsIgnoreCase(subtype)) return ZohodeskConstants.ENDPOINT_CONTACTS;
         if (ZohodeskConstants.OBJECT_SUBTYPE_ACCOUNTS.equalsIgnoreCase(subtype)) return ZohodeskConstants.ENDPOINT_ACCOUNTS;
         if (ZohodeskConstants.OBJECT_SUBTYPE_DEPARTMENTS.equalsIgnoreCase(subtype)) return ZohodeskConstants.ENDPOINT_DEPARTMENTS;
@@ -224,7 +224,7 @@ public class ZohodeskMetadataService implements MetadataService {
         return ZohodeskConstants.ENDPOINT_TICKETS;
     }
 
-    static String inferType(Object value) {
+    public static String inferType(Object value) {
         if (value == null) return "STRING";
         if (value instanceof Integer || value instanceof Long) return "INTEGER";
         if (value instanceof Float || value instanceof Double) return "FLOAT";

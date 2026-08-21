@@ -5,15 +5,14 @@ import com.ovaledge.csp.apps.app.generator.ConnectorGeneratorResult;
 import com.ovaledge.csp.apps.app.generator.ConnectorGeneratorService;
 import com.ovaledge.csp.apps.app.generator.ConnectorGeneratorValidationException;
 import com.ovaledge.csp.validation.LegacyPlatformServerTypes;
-import com.ovaledge.csp.validation.ServerTypeNormalizer;
 import com.ovaledge.csp.v3.core.apps.model.ObjectKind;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,9 +56,20 @@ public class ConnectorGeneratorController {
     public ResponseEntity<Map<String, Object>> getReservedServerTypes(
             @RequestParam(value = "repoRoot", required = false) String repoRoot) {
         Path repoRootPath = ConnectorGeneratorService.resolveRepoRootPath(repoRoot);
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("reservedServerTypes", new ArrayList<>(LegacyPlatformServerTypes.blockedNamesForNewConnector(repoRootPath)));
-        return ResponseEntity.ok(body);
+        if (!Files.exists(repoRootPath) || !Files.isDirectory(repoRootPath)) {
+            return ResponseEntity.badRequest()
+                    .body(errorResponse("Failed to load reserved server types",
+                            List.of("Repository root path does not exist: " + repoRootPath)));
+        }
+        try {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("reservedServerTypes",
+                    new ArrayList<>(LegacyPlatformServerTypes.blockedNamesForNewConnector(repoRootPath)));
+            return ResponseEntity.ok(body);
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.badRequest()
+                    .body(errorResponse("Failed to load reserved server types", List.of(ex.getMessage())));
+        }
     }
 
     /**
@@ -74,14 +84,13 @@ public class ConnectorGeneratorController {
             @RequestParam("name") String name,
             @RequestParam(value = "repoRoot", required = false) String repoRoot) {
         Path repoRootPath = ConnectorGeneratorService.resolveRepoRootPath(repoRoot);
-        String artifactId = ServerTypeNormalizer.normalize(name);
+        LegacyPlatformServerTypes.NewConnectorNameEvaluation evaluation =
+                LegacyPlatformServerTypes.evaluateNameForNewConnector(name, repoRootPath);
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("artifactId", artifactId);
-        body.put("blockedExact", LegacyPlatformServerTypes.isExactBlockedForNewConnector(name, repoRootPath));
-        body.put("blocked", LegacyPlatformServerTypes.isBlockedForNewConnector(name, repoRootPath));
-        body.put(
-                "suggestedAlternate",
-                LegacyPlatformServerTypes.suggestAlternateForNewConnector(name, repoRootPath));
+        body.put("artifactId", evaluation.artifactId());
+        body.put("blockedExact", evaluation.blocked());
+        body.put("blocked", evaluation.blocked());
+        body.put("suggestedAlternate", evaluation.suggestedAlternate());
         return ResponseEntity.ok(body);
     }
 
@@ -148,9 +157,9 @@ public class ConnectorGeneratorController {
 
     @GetMapping("/default-repo-root")
     public ResponseEntity<Map<String, String>> getDefaultRepoRoot() {
-        String repoRoot = Optional.ofNullable(System.getProperty("user.dir")).orElse("");
+        Path repoRootPath = ConnectorGeneratorService.resolveRepoRootPath(null);
         Map<String, String> response = new LinkedHashMap<>();
-        response.put("repoRoot", repoRoot);
+        response.put("repoRoot", repoRootPath.toString());
         return ResponseEntity.ok(response);
     }
 

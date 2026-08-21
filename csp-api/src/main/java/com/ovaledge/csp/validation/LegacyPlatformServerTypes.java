@@ -76,23 +76,41 @@ public final class LegacyPlatformServerTypes {
     }
 
     /**
-     * Returns server type names blocked for a new connector: legacy txt list (as-is) union in-repo owned types.
+     * Returns normalized server type names blocked for a new connector: legacy txt list union in-repo owned types.
      *
-     * <p>Displayed in the Connector Generator reserved-names UI. Compare proposed ids with
-     * {@link ServerTypeNormalizer#normalize(String)} — not raw string equality.
+     * <p>Displayed in the Connector Generator reserved-names UI. Entries are canonical ids suitable for
+     * comparison with {@link ServerTypeNormalizer#normalize(String)}.
      *
      * @param repoRoot directory containing root {@code pom.xml}
-     * @return sorted unmodifiable set of blocked display names
+     * @return sorted unmodifiable set of blocked normalized names
      */
     public static Set<String> blockedNamesForNewConnector(Path repoRoot) {
-        try {
-            Set<String> blocked = new TreeSet<>(FORBIDDEN_RAW);
-            blocked.addAll(SdkConnectorReactorScanner.scan(repoRoot).ownedServerTypes());
-            return Collections.unmodifiableSet(blocked);
-        } catch (Exception ex) {
-            throw new IllegalStateException("Failed to scan SDK connector server types under " + repoRoot, ex);
-        }
+        return blockedNormalizedNamesForNewConnector(repoRoot);
     }
+
+    /**
+     * Evaluates a proposed connector name with a single reactor scan.
+     *
+     * @param name connector name or artifact id
+     * @param repoRoot repository root for reactor scan
+     * @return normalized artifact id, blocked flag, and versioned alternate suggestion
+     */
+    public static NewConnectorNameEvaluation evaluateNameForNewConnector(String name, Path repoRoot) {
+        Set<String> blocked = blockedNormalizedNamesForNewConnector(repoRoot);
+        String normalized = normalize(name);
+        boolean isBlocked = !normalized.isEmpty() && blocked.contains(normalized);
+        String suggestedAlternate = ServerTypeNormalizer.suggestAlternate(normalized, blocked);
+        return new NewConnectorNameEvaluation(normalized, isBlocked, suggestedAlternate);
+    }
+
+    /**
+     * Result of evaluating a proposed connector name against blocked legacy and in-repo types.
+     *
+     * @param artifactId normalized artifact id / server type
+     * @param blocked whether the name must not be used for a new connector
+     * @param suggestedAlternate next available versioned alternate ({@code stemv2}, {@code stemv3}, …)
+     */
+    public record NewConnectorNameEvaluation(String artifactId, boolean blocked, String suggestedAlternate) {}
 
     /**
      * Returns whether a proposed connector name is blocked (legacy txt or already used in-repo).

@@ -57,10 +57,10 @@ Check that the connector module has the correct layout:
 │   │   └── com.ovaledge.csp.v3.core.apps.service.AppsConnector
 │   └── static/
 │       └── {connector-id}.png
-└── src/test/java/com/ovaledge/csp/apps/{package}/main/
-    ├── {Prefix}ConnectorTest.java
-    ├── {Prefix}MetadataServiceTest.java
-    └── {Prefix}QueryServiceTest.java
+└── src/test/java/com/ovaledge/csp/tests/unit/connector/{package}/
+    ├── {Prefix}ConnectorUnitTest.java
+    ├── {Prefix}MetadataServiceUnitTest.java
+    └── {Prefix}QueryServiceUnitTest.java
 ```
 
 **1.2 SPI Registration**
@@ -226,11 +226,11 @@ Review `{Prefix}Controller.java`:
 
 **7.1 Test Coverage**
 
-- [ ] `{Prefix}ConnectorTest.java` exists with tests for all public methods
-- [ ] `{Prefix}MetadataServiceTest.java` exists with metadata tests
-- [ ] `{Prefix}QueryServiceTest.java` exists with query tests
+- [ ] `{Prefix}ConnectorUnitTest.java` exists with tests for all public methods
+- [ ] `{Prefix}MetadataServiceUnitTest.java` exists with metadata tests
+- [ ] `{Prefix}QueryServiceUnitTest.java` exists with query tests
 - [ ] Tests cover happy path, error scenarios, and edge cases
-- [ ] Tests pass: `mvn test -pl {connector-id}`
+- [ ] Tests pass: `mvn -pl {connector-id} -Punit-tests test`
 
 **7.2 Edge Case Coverage**
 
