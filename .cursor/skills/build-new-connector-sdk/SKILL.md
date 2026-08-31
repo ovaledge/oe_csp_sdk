@@ -88,7 +88,8 @@ Create a new Maven module under `oe_csp_sdk` with this structure:
 │   ├── main/
 │   │   ├── {Prefix}Connector.java
 │   │   ├── {Prefix}MetadataService.java
-│   │   └── {Prefix}QueryService.java
+│   │   ├── {Prefix}QueryService.java
+│   │   └── {Prefix}ProfilingService.java   optional: only when Profiling is enabled in the UI generator
 │   ├── constants/
 │   │   └── {Prefix}Constants.java
 │   ├── client/                           optional: API/HTTP client
@@ -118,6 +119,7 @@ Create a new Maven module under `oe_csp_sdk` with this structure:
   - `validateConnection(ConnectionConfig config)` — test credentials/connectivity; return `ValidateConnectionResponse` (success/valid/message). Use `config` **as-is** (do not build or complete ConnectionConfig from attributes; the caller provides it). For OAuth2, support code exchange and “auth required” with URL.
   - `getMetadataService()` — return your `{Prefix}MetadataService`.
   - `getQueryService()` — return your `{Prefix}QueryService`.
+  - **Optional:** `getProfilingService()` — return `{Prefix}ProfilingService` only when Profiling was enabled in the csp-api UI generator (or you implement it by hand). Default is `null`. DBMS reference: `monetdb`. Sample-only: generator SAMPLE stub.
   - `getAttributes()` — build connection form: call `getCredentialManagerCommonAttributes(attributes)`, then `getGenericAttributes()`, then add connector-specific attributes (client id/secret, tokens, environment, etc.), then `getGovernanceAttributes(attributes)` and `getSecurityAndGovernanceRolesAttributes(attributes)`. Use a **Constants** class for keys and labels.
   - `exchangeAttributes(ConnInfo connInfo)` — map saved ConnInfo back to UI attribute map (include connector-specific keys from Constants).
   - `exchangeAttributes(Map<String, ConnectionAttribute> attributes)` — map UI attributes to ConnInfo (including additionalAttr for connector-specific values).
@@ -172,6 +174,18 @@ Implements `QueryService`:
   - Honor `request.getLimit()` and `request.getOffset()`; paginate if the API supports it.
 
 Use `request.getConnectionConfig()` **as-is** and entity type/id from the request. Obtain the connection resource directly in the service and run the query there. Do not delegate to a Client unless the source is REST/OAuth2 (see §5).
+
+---
+
+## 4b. ProfilingService (`{Prefix}ProfilingService.java`) — optional
+
+Only when Profiling is enabled in the **csp-api UI generator** (or you implement it by hand). Default `AppsConnector.getProfilingService()` is `null`.
+
+- Extend `AbstractProfilingService`. Override `getProfilingService()` on the connector to return the instance.
+- **DBMS (JDBC):** follow `monetdb` (`MonetDBProfilingService`) — `getRowCount`, `profileColumn`, `sampleProfile`; JSON `P`/`TC`/`VC`/`A`/`S`/`Q`/`D`.
+- **SAMPLE only:** keep generator SAMPLE stubs; implement `getRowCount` and `sampleProfile`; leave `profileColumn` unsupported. Do not inherit the abstract `getRowCount` throw — OvalEdge skips sample profiling on that exception or a zero count.
+- Match `configs/{connector-id}.json` `profiling` / `sampleProfiling` and crawler options to the implementation.
+- Test via csp-api `/profiling/*`. Contract, field mapping, identity, and CLB-22 notes: [Connector Interface Reference §4.4](../../../.docs/Connector_Interface_Reference.md#44-profilingservice-optional-contract).
 
 ---
 

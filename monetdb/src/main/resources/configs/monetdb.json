@@ -22,9 +22,9 @@
         "crawling": true,
         "deltaCrawling": false,
         "queryLogsCrawling": false,
-        "profiling": false,
+        "profiling": true,
         "deltaProfiling": false,
-        "sampleProfiling": false,
+        "sampleProfiling": true,
         "conditionalProfiling": false,
         "querySheet": true,
         "queryPolicies": false,
@@ -80,8 +80,8 @@
         "remotepolicy": false,
         "fullcrawl": true,
         "incrementalcrawl": false,
-        "profiletablesandcols": false,
-        "profileviewsandcols": false
+        "profiletablesandcols": true,
+        "profileviewsandcols": true
     },
     "crawlerOptions": [
         {
@@ -97,7 +97,14 @@
             "optionKey": "IN"
         },
         { "optionType": "CRAWLER_PREFERENCE", "optionKey": "S" },
-        { "optionType": "CRAWLER_PREFERENCE", "optionKey": "C" }
+        { "optionType": "CRAWLER_PREFERENCE", "optionKey": "C" },
+        { "optionType": "CRAWLER_PREFERENCE", "optionKey": "P" },
+        { "optionType": "PROFILE_OPTIONS", "optionKey": "TC" },
+        { "optionType": "PROFILE_OPTIONS", "optionKey": "VC" },
+        { "optionType": "PROFILE_TYPES", "optionKey": "A" },
+        { "optionType": "PROFILE_TYPES", "optionKey": "S" },
+        { "optionType": "PROFILE_TYPES", "optionKey": "Q" },
+        { "optionType": "PROFILE_TYPES", "optionKey": "D" }
     ],
     "credentialManagerMappings": [
         "DATABASE"

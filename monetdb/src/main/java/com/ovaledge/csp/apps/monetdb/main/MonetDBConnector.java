@@ -15,6 +15,7 @@ import com.ovaledge.csp.v3.core.apps.service.AppsConnector;
 import com.ovaledge.csp.v3.core.apps.service.BaseAppConnector;
 import com.ovaledge.csp.v3.core.apps.service.SdkConnector;
 import com.ovaledge.csp.v3.core.apps.service.MetadataService;
+import com.ovaledge.csp.v3.core.apps.service.ProfilingService;
 import com.ovaledge.csp.v3.core.apps.service.QueryService;
 import com.ovaledge.csp.v3.core.apps.utils.LogUtils;
 import com.ovaledge.csp.v3.core.apps.utils.Utils;
@@ -47,6 +48,7 @@ public class MonetDBConnector extends BaseAppConnector implements AppsConnector 
 
     private final MonetDBMetadataService metadataService = new MonetDBMetadataService();
     private final MonetDBQueryService queryService = new MonetDBQueryService();
+    private final MonetDBProfilingService profilingService = new MonetDBProfilingService();
 
 /**
      * Return the server type identifier for this connector.
@@ -188,6 +190,15 @@ public class MonetDBConnector extends BaseAppConnector implements AppsConnector 
     @Override
     public QueryService getQueryService() {
         return queryService;
+    }
+
+    /**
+     * Returns the MonetDB {@link ProfilingService} (row count, column, sample, batch).
+     * File profiling is not implemented; {@code profileFile} throws unsupported.
+     */
+    @Override
+    public ProfilingService getProfilingService() {
+        return profilingService;
     }
 
     @Override

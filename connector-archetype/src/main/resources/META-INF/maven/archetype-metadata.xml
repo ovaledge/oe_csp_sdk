@@ -8,6 +8,27 @@
         <requiredProperty key="sdkVersion">
             <defaultValue>${project.version}</defaultValue>
         </requiredProperty>
+        <requiredProperty key="profilingServiceImport">
+            <defaultValue></defaultValue>
+        </requiredProperty>
+        <requiredProperty key="profilingServiceField">
+            <defaultValue></defaultValue>
+        </requiredProperty>
+        <requiredProperty key="profilingServiceGetter">
+            <defaultValue></defaultValue>
+        </requiredProperty>
+        <requiredProperty key="profilingServiceMethods">
+            <defaultValue></defaultValue>
+        </requiredProperty>
+        <requiredProperty key="profilingServiceUnitTestBody">
+            <defaultValue></defaultValue>
+        </requiredProperty>
+        <requiredProperty key="profilingServiceConnectorImport">
+            <defaultValue></defaultValue>
+        </requiredProperty>
+        <requiredProperty key="profilingServiceConnectorTest">
+            <defaultValue></defaultValue>
+        </requiredProperty>
     </requiredProperties>
     <fileSets>
         <fileSet filtered="true" encoding="UTF-8">

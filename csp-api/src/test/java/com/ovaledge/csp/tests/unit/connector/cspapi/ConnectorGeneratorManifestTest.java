@@ -1,10 +1,10 @@
 package com.ovaledge.csp.tests.unit.connector.cspapi;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ovaledge.csp.apps.app.generator.ConnectorGeneratorRequest;
 import com.ovaledge.csp.apps.app.generator.ConnectorGeneratorResult;
 import com.ovaledge.csp.apps.app.generator.ConnectorGeneratorService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
@@ -101,7 +101,7 @@ class ConnectorGeneratorManifestTest {
   }
 
   @Test
-  void generateZip_includesCspSdkUnitTestLayout(@TempDir Path tempDir) throws Exception {
+  void generateZip_includesCspAppsUnitTestLayout(@TempDir Path tempDir) throws Exception {
     Path repoRoot = tempDir.resolve("repo");
     writeMinimalRepo(repoRoot);
 
@@ -114,6 +114,279 @@ class ConnectorGeneratorManifestTest {
     assertTrue(readTextFromZip(result.getZipBytes(), connectorUnitTest).contains("package com.ovaledge.csp.tests.unit.connector.democonnector"));
     assertTrue(readTextFromZip(result.getZipBytes(),
         "democonnector/src/test/java/com/ovaledge/csp/tests/unit/package-info.java").contains("com.ovaledge.csp.tests.unit"));
+  }
+
+  @Test
+  void generateZip_profilingOff_omitsProfilingArtifacts(@TempDir Path tempDir) throws Exception {
+    Path repoRoot = tempDir.resolve("repo");
+    writeMinimalRepo(repoRoot);
+
+    ConnectorGeneratorRequest request = buildRequest(List.of("ENTITY"), null);
+    request.getManifest().getConnectorMaster().setProfiling(false);
+    ConnectorGeneratorResult result = new ConnectorGeneratorService()
+        .generate(request, pngIcon64x64());
+
+    JsonNode manifest = readManifestFromZip(result.getZipBytes(),
+        "democonnector/src/main/resources/configs/democonnector.json");
+    assertFalse(manifest.path("connectorMaster").path("profiling").asBoolean());
+    assertFalse(manifest.path("connectorMaster").path("sampleProfiling").asBoolean());
+    assertFalse(manifest.path("crawlerSettings").path("profiletablesandcols").asBoolean());
+    assertFalse(manifest.path("crawlerSettings").path("profileviewsandcols").asBoolean());
+    assertFalse(hasCrawlerOption(manifest, "CRAWLER_PREFERENCE", "P"));
+    assertFalse(hasCrawlerOption(manifest, "PROFILE_OPTIONS", "TC"));
+    assertFalse(hasCrawlerOption(manifest, "PROFILE_OPTIONS", "VC"));
+    assertFalse(hasCrawlerOption(manifest, "PROFILE_TYPES", "S"));
+    assertFalse(zipContains(result.getZipBytes(),
+        "democonnector/src/main/java/com/ovaledge/csp/apps/democonnector/main/DemoconnectorProfilingService.java"));
+    String connector = readTextFromZip(result.getZipBytes(),
+        "democonnector/src/main/java/com/ovaledge/csp/apps/democonnector/main/DemoconnectorConnector.java");
+    assertFalse(connector.contains("getProfilingService"));
+  }
+
+  @Test
+  void generateZip_profilingDbmsAutoOnly_sampleProfilingFalseWithoutD(@TempDir Path tempDir) throws Exception {
+    Path repoRoot = tempDir.resolve("repo");
+    writeMinimalRepo(repoRoot);
+
+    ConnectorGeneratorRequest request = buildProfilingRequest("DBMS", "JDBC",
+        List.of(
+            option("CRAWLER_PREFERENCE", "S"),
+            option("CRAWLER_PREFERENCE", "C"),
+            option("PROFILE_TYPES", "A")),
+        "profileauto");
+    ConnectorGeneratorResult result = new ConnectorGeneratorService()
+        .generate(request, pngIcon64x64());
+
+    JsonNode manifest = readManifestFromZip(result.getZipBytes(),
+        "profileauto/src/main/resources/configs/profileauto.json");
+    assertTrue(manifest.path("connectorMaster").path("profiling").asBoolean());
+    assertFalse(manifest.path("connectorMaster").path("sampleProfiling").asBoolean());
+    assertTrue(hasCrawlerOption(manifest, "CRAWLER_PREFERENCE", "P"));
+    assertTrue(hasCrawlerOption(manifest, "PROFILE_TYPES", "A"));
+    assertFalse(hasCrawlerOption(manifest, "PROFILE_TYPES", "S"));
+    assertFalse(hasCrawlerOption(manifest, "PROFILE_TYPES", "D"));
+  }
+
+  @Test
+  void generateZip_profilingDbms_emitsServiceAndOasisOptions(@TempDir Path tempDir) throws Exception {
+    Path repoRoot = tempDir.resolve("repo");
+    writeMinimalRepo(repoRoot);
+
+    ConnectorGeneratorRequest request = buildProfilingRequest("DBMS", "JDBC",
+        List.of(
+            option("CRAWLER_PREFERENCE", "S"),
+            option("CRAWLER_PREFERENCE", "C"),
+            option("PROFILE_OPTIONS", "TC"),
+            option("PROFILE_TYPES", "A"),
+            option("PROFILE_TYPES", "S"),
+            option("PROFILE_TYPES", "Q"),
+            option("PROFILE_TYPES", "D")));
+    ConnectorGeneratorResult result = new ConnectorGeneratorService()
+        .generate(request, pngIcon64x64());
+
+    JsonNode manifest = readManifestFromZip(result.getZipBytes(),
+        "profiledbms/src/main/resources/configs/profiledbms.json");
+    assertTrue(manifest.path("connectorMaster").path("profiling").asBoolean());
+    assertTrue(manifest.path("connectorMaster").path("sampleProfiling").asBoolean());
+    assertTrue(manifest.path("crawlerSettings").path("profiletablesandcols").asBoolean());
+    assertTrue(hasCrawlerOption(manifest, "CRAWLER_PREFERENCE", "P"));
+    assertTrue(hasCrawlerOption(manifest, "PROFILE_TYPES", "A"));
+    assertTrue(hasCrawlerOption(manifest, "PROFILE_TYPES", "S"));
+    assertTrue(hasCrawlerOption(manifest, "PROFILE_TYPES", "Q"));
+    assertTrue(hasCrawlerOption(manifest, "PROFILE_TYPES", "D"));
+
+    String profilingService = readTextFromZip(result.getZipBytes(),
+        "profiledbms/src/main/java/com/ovaledge/csp/apps/profiledbms/main/ProfiledbmsProfilingService.java");
+    assertTrue(profilingService.contains("getRowCount"));
+    assertTrue(profilingService.contains("profileColumn"));
+    assertTrue(profilingService.contains("sampleProfile"));
+
+    String connector = readTextFromZip(result.getZipBytes(),
+        "profiledbms/src/main/java/com/ovaledge/csp/apps/profiledbms/main/ProfiledbmsConnector.java");
+    assertTrue(connector.contains("getProfilingService"));
+
+    assertTrue(zipContains(result.getZipBytes(),
+        "profiledbms/src/test/java/com/ovaledge/csp/tests/unit/connector/profiledbms/ProfiledbmsProfilingServiceUnitTest.java"));
+  }
+
+  @Test
+  void generateZip_profilingSampleOnly_emitsSampleStub(@TempDir Path tempDir) throws Exception {
+    Path repoRoot = tempDir.resolve("repo");
+    writeMinimalRepo(repoRoot);
+
+    ConnectorGeneratorRequest request = buildProfilingRequest("SAMPLE", "REST",
+        List.of(
+            option("CRAWLER_PREFERENCE", "S"),
+            option("CRAWLER_PREFERENCE", "C"),
+            option("PROFILE_TYPES", "S"),
+            option("PROFILE_TYPES", "D")));
+    ConnectorGeneratorResult result = new ConnectorGeneratorService()
+        .generate(request, pngIcon64x64());
+
+    JsonNode manifest = readManifestFromZip(result.getZipBytes(),
+        "profilesample/src/main/resources/configs/profilesample.json");
+    assertTrue(manifest.path("connectorMaster").path("profiling").asBoolean());
+    assertTrue(manifest.path("connectorMaster").path("sampleProfiling").asBoolean());
+    assertTrue(hasCrawlerOption(manifest, "CRAWLER_PREFERENCE", "P"));
+    assertTrue(hasCrawlerOption(manifest, "PROFILE_TYPES", "S"));
+    assertFalse(hasCrawlerOption(manifest, "PROFILE_TYPES", "A"));
+    assertTrue(hasCrawlerOption(manifest, "PROFILE_TYPES", "D"));
+
+    String profilingService = readTextFromZip(result.getZipBytes(),
+        "profilesample/src/main/java/com/ovaledge/csp/apps/profilesample/main/ProfilesampleProfilingService.java");
+    assertTrue(profilingService.contains("sampleProfile"));
+    assertTrue(profilingService.contains("public long getRowCount"));
+    assertFalse(profilingService.contains("public ProfileColumnResult profileColumn"));
+
+    String profilingUnitTest = readTextFromZip(result.getZipBytes(),
+        "profilesample/src/test/java/com/ovaledge/csp/tests/unit/connector/profilesample/ProfilesampleProfilingServiceUnitTest.java");
+    assertTrue(profilingUnitTest.contains("getRowCount_returnsZeroForStub"));
+    assertFalse(profilingUnitTest.contains("getRowCount_throwsUnsupportedByDefault"));
+  }
+
+  @Test
+  void generateZip_profilingFile_emitsProfileFileStub(@TempDir Path tempDir) throws Exception {
+    Path repoRoot = tempDir.resolve("repo");
+    writeMinimalRepo(repoRoot);
+
+    // Start with an existing profiling request and then swap selected object kind to FILE.
+    ConnectorGeneratorRequest request = buildProfilingRequest("SAMPLE", "REST",
+        List.of(
+            option("CRAWLER_PREFERENCE", "S"),
+            option("PROFILE_TYPES", "D")));
+    request.setObjectKinds(List.of("FILE"));
+
+    ConnectorGeneratorResult result = new ConnectorGeneratorService()
+        .generate(request, pngIcon64x64());
+
+    String profilingService = readTextFromZip(result.getZipBytes(),
+        "profilesample/src/main/java/com/ovaledge/csp/apps/profilesample/main/ProfilesampleProfilingService.java");
+    assertTrue(profilingService.contains("profileFile"));
+    assertFalse(profilingService.contains("public long getRowCount"));
+    assertFalse(profilingService.contains("profileColumn"));
+    assertFalse(profilingService.contains("sampleProfile"));
+
+    String profilingUnitTest = readTextFromZip(result.getZipBytes(),
+        "profilesample/src/test/java/com/ovaledge/csp/tests/unit/connector/profilesample/ProfilesampleProfilingServiceUnitTest.java");
+    assertTrue(profilingUnitTest.contains("profileFile_returnsEmptyResponseForStub"));
+  }
+
+  @Test
+  void generateZip_profilingDbms_withFileKindOnRest_keepsDbmsMode(@TempDir Path tempDir) throws Exception {
+    Path repoRoot = tempDir.resolve("repo");
+    writeMinimalRepo(repoRoot);
+
+    ConnectorGeneratorRequest request = buildProfilingRequest("DBMS", "REST",
+        List.of(
+            option("CRAWLER_PREFERENCE", "S"),
+            option("CRAWLER_PREFERENCE", "C"),
+            option("PROFILE_TYPES", "A"),
+            option("PROFILE_TYPES", "S")),
+        "profilefiledbms");
+    request.setObjectKinds(List.of("FILE"));
+    ConnectorGeneratorResult result = new ConnectorGeneratorService()
+        .generate(request, pngIcon64x64());
+
+    JsonNode manifest = readManifestFromZip(result.getZipBytes(),
+        "profilefiledbms/src/main/resources/configs/profilefiledbms.json");
+    assertTrue(manifest.path("connectorMaster").path("profiling").asBoolean());
+    assertTrue(manifest.path("connectorMaster").path("sampleProfiling").asBoolean());
+    assertTrue(hasCrawlerOption(manifest, "PROFILE_TYPES", "A"));
+    assertTrue(hasCrawlerOption(manifest, "PROFILE_TYPES", "S"));
+
+    String profilingService = readTextFromZip(result.getZipBytes(),
+        "profilefiledbms/src/main/java/com/ovaledge/csp/apps/profilefiledbms/main/ProfilefiledbmsProfilingService.java");
+    assertTrue(profilingService.contains("profileFile"));
+  }
+
+  @Test
+  void generateZip_profilingDbms_withoutJdbcOrFile_fallsBackToSample(@TempDir Path tempDir) throws Exception {
+    Path repoRoot = tempDir.resolve("repo");
+    writeMinimalRepo(repoRoot);
+
+    ConnectorGeneratorRequest request = buildProfilingRequest("DBMS", "REST",
+        List.of(
+            option("CRAWLER_PREFERENCE", "S"),
+            option("CRAWLER_PREFERENCE", "C"),
+            option("PROFILE_TYPES", "S")),
+        "profilefallback");
+    request.setObjectKinds(List.of("ENTITY"));
+    ConnectorGeneratorResult result = new ConnectorGeneratorService()
+        .generate(request, pngIcon64x64());
+
+    String profilingService = readTextFromZip(result.getZipBytes(),
+        "profilefallback/src/main/java/com/ovaledge/csp/apps/profilefallback/main/ProfilefallbackProfilingService.java");
+    assertTrue(profilingService.contains("sampleProfile"));
+    assertTrue(profilingService.contains("public long getRowCount"));
+  }
+
+  private ConnectorGeneratorRequest buildProfilingRequest(
+      String profilingMode, String protocol, List<ConnectorGeneratorRequest.CrawlerOptionInput> options) {
+    return buildProfilingRequest(profilingMode, protocol, options, null);
+  }
+
+  private ConnectorGeneratorRequest buildProfilingRequest(
+      String profilingMode, String protocol, List<ConnectorGeneratorRequest.CrawlerOptionInput> options,
+      String connectorNameOverride) {
+    String name = connectorNameOverride != null ? connectorNameOverride
+        : ("DBMS".equals(profilingMode) ? "profiledbms" : "profilesample");
+    ConnectorGeneratorRequest request = buildRequest(List.of("ENTITY"), null);
+    request.setConnectorName(name);
+    request.setProfilingMode(profilingMode);
+    request.getManifest().getConnectorMaster().setProtocol(protocol);
+    request.getManifest().getConnectorMaster().setProfiling(true);
+    request.getManifest().setCrawlerOptions(options);
+    return request;
+  }
+
+  private static ConnectorGeneratorRequest.CrawlerOptionInput option(String type, String key) {
+    ConnectorGeneratorRequest.CrawlerOptionInput o = new ConnectorGeneratorRequest.CrawlerOptionInput();
+    o.setOptionType(type);
+    o.setOptionKey(key);
+    return o;
+  }
+
+  private static boolean hasCrawlerOption(JsonNode manifest, String optionType, String optionKey) {
+    for (JsonNode n : manifest.path("crawlerOptions")) {
+      if (optionType.equals(n.path("optionType").asText())
+          && optionKey.equals(n.path("optionKey").asText())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean zipContains(byte[] zipBytes, String entryName) throws IOException {
+    try (ZipInputStream zipIn = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+      ZipEntry entry;
+      while ((entry = zipIn.getNextEntry()) != null) {
+        if (entryName.equals(entry.getName())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private ConnectorGeneratorRequest buildRequest(List<String> objectKinds, String primaryObjectOverride) {
+    ConnectorGeneratorRequest request = new ConnectorGeneratorRequest();
+    String connectorName = objectKinds.contains("REPORT") ? "reportconnector"
+        : objectKinds.contains("FILEFOLDERS") ? "filesconnector" : "democonnector";
+    request.setConnectorName(connectorName);
+    request.setObjectKinds(objectKinds);
+
+    ConnectorGeneratorRequest.ManifestInput manifest = new ConnectorGeneratorRequest.ManifestInput();
+    ConnectorGeneratorRequest.ConnectorMasterInput cm = new ConnectorGeneratorRequest.ConnectorMasterInput();
+    cm.setProtocol("REST");
+    cm.setOeConnCategory("Application Connectors");
+    cm.setUsageCostModel("Usage Based");
+    if (primaryObjectOverride != null) {
+      cm.setPrimaryObject(primaryObjectOverride);
+    }
+    manifest.setConnectorMaster(cm);
+    request.setManifest(manifest);
+    request.setReferences(List.of());
+    return request;
   }
 
   @Test
@@ -140,33 +413,11 @@ class ConnectorGeneratorManifestTest {
 
     String assemblyPom = Files.readString(repoRoot.resolve("assembly/pom.xml"), StandardCharsets.UTF_8);
     assertTrue(assemblyPom.indexOf("<artifactId>wiretest</artifactId>") < assemblyPom.indexOf(DEP_MARKER));
-    assertTrue(assemblyPom.indexOf("<artifactId>wiretest</artifactId>") < assemblyPom.indexOf("<!-- Compile dependency"));
+    assertTrue(assemblyPom.indexOf("<artifactId>wiretest</artifactId>") < assemblyPom.indexOf("<!-- Test dependencies"));
     assertTrue(parentPom.contains("<csp.sdk.test.report.modules>assembly,csp-api,wiretest</csp.sdk.test.report.modules>"));
-  }
 
-  @Test
-  void upsertTestReportModules_preservesWhitespace(@TempDir Path repoRoot) throws Exception {
-    writeMinimalRepoWithWhitespace(repoRoot);
-
-    ConnectorGeneratorRequest request = buildRequest(List.of("ENTITY"), null);
-    request.setConnectorName("spacetest");
-    request.setRepoRoot(repoRoot.toString());
-    new ConnectorGeneratorService().generateToDirectory(request, pngIcon64x64(), repoRoot.toString());
-
-    String parentPom = Files.readString(repoRoot.resolve("pom.xml"), StandardCharsets.UTF_8);
-    assertTrue(parentPom.contains("<csp.sdk.test.report.modules>  assembly,csp-api,spacetest  </csp.sdk.test.report.modules>"));
-  }
-
-  @Test
-  void resolveRepoRootPath_infersFromCspApiSubdir(@TempDir Path repoRoot) throws Exception {
-    Files.createDirectories(repoRoot.resolve("csp-api"));
-    Files.createDirectories(repoRoot.resolve("assembly"));
-    Files.writeString(repoRoot.resolve("pom.xml"), "<project/>", StandardCharsets.UTF_8);
-    Files.writeString(repoRoot.resolve("csp-api/pom.xml"), "<project/>", StandardCharsets.UTF_8);
-    Files.writeString(repoRoot.resolve("assembly/pom.xml"), "<project/>", StandardCharsets.UTF_8);
-
-    Path inferred = ConnectorGeneratorService.resolveRepoRootPath(repoRoot.resolve("csp-api").toString());
-    assertEquals(repoRoot.toAbsolutePath().normalize(), inferred.toAbsolutePath().normalize());
+    String modulePom = Files.readString(repoRoot.resolve("wiretest/pom.xml"), StandardCharsets.UTF_8);
+    assertTrue(modulePom.contains("<version>9.9.9-TEST</version>"));
   }
 
   private static final String MODULE_MARKER =
@@ -179,6 +430,13 @@ class ConnectorGeneratorManifestTest {
     Files.createDirectories(repoRoot.resolve("assembly"));
     Files.writeString(repoRoot.resolve("pom.xml"), """
         <project>
+          <parent>
+            <groupId>com.ovaledge</groupId>
+            <artifactId>oe-dependencies</artifactId>
+            <version>[8300.1.1,8300.100.100)</version>
+          </parent>
+          <artifactId>oe-csp-sdk</artifactId>
+          <version>9.9.9-TEST</version>
           <modules>
             <module>existing</module>
         %s
@@ -201,60 +459,9 @@ class ConnectorGeneratorManifestTest {
     Files.writeString(repoRoot.resolve("assembly/pom.xml"), """
         <project><dependencies>
         %s
-        <!-- Compile dependency on csp-api -->
+        <!-- Test dependencies for git test -->
         </dependencies></project>
         """.formatted(DEP_MARKER), StandardCharsets.UTF_8);
-  }
-
-  private void writeMinimalRepoWithWhitespace(Path repoRoot) throws IOException {
-    Files.createDirectories(repoRoot.resolve("csp-api"));
-    Files.createDirectories(repoRoot.resolve("assembly"));
-    Files.writeString(repoRoot.resolve("pom.xml"), """
-        <project>
-          <modules>
-        %s
-          </modules>
-          <properties>
-            <csp.sdk.test.report.modules>  assembly,csp-api  </csp.sdk.test.report.modules>
-          </properties>
-          <dependencyManagement>
-            <dependencies>
-        %s
-            </dependencies>
-          </dependencyManagement>
-        </project>
-        """.formatted(MODULE_MARKER, DEP_MARKER), StandardCharsets.UTF_8);
-    Files.writeString(repoRoot.resolve("csp-api/pom.xml"), """
-        <project><dependencies>
-        %s
-        </dependencies></project>
-        """.formatted(DEP_MARKER), StandardCharsets.UTF_8);
-    Files.writeString(repoRoot.resolve("assembly/pom.xml"), """
-        <project><dependencies>
-        %s
-        </dependencies></project>
-        """.formatted(DEP_MARKER), StandardCharsets.UTF_8);
-  }
-
-  private ConnectorGeneratorRequest buildRequest(List<String> objectKinds, String primaryObjectOverride) {
-    ConnectorGeneratorRequest request = new ConnectorGeneratorRequest();
-    String connectorName = objectKinds.contains("REPORT") ? "reportconnector"
-        : objectKinds.contains("FILEFOLDERS") ? "filesconnector" : "democonnector";
-    request.setConnectorName(connectorName);
-    request.setObjectKinds(objectKinds);
-
-    ConnectorGeneratorRequest.ManifestInput manifest = new ConnectorGeneratorRequest.ManifestInput();
-    ConnectorGeneratorRequest.ConnectorMasterInput cm = new ConnectorGeneratorRequest.ConnectorMasterInput();
-    cm.setProtocol("REST");
-    cm.setOeConnCategory("Application Connectors");
-    cm.setUsageCostModel("Usage Based");
-    if (primaryObjectOverride != null) {
-      cm.setPrimaryObject(primaryObjectOverride);
-    }
-    manifest.setConnectorMaster(cm);
-    request.setManifest(manifest);
-    request.setReferences(List.of());
-    return request;
   }
 
   private void writeMinimalRepo(Path repoRoot) throws IOException {

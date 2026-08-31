@@ -1033,6 +1033,49 @@ body {
     width: 100%;
 }
 
+.profiling-mode-group {
+    margin-top: 8px;
+}
+
+.profiling-mode-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.profiling-mode-label {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #374151;
+    min-width: 40px;
+}
+
+.profiling-mode-hint {
+    margin-top: 4px;
+    line-height: 1.35;
+}
+
+.profiling-mode-hint .profiling-mode-action {
+    margin-left: 6px;
+    border: none;
+    background: none;
+    padding: 0;
+    color: #1D4ED8;
+    font-size: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.profiling-mode-hint .profiling-mode-action:hover {
+    color: #1E40AF;
+}
+
+#profilingModeToggle:has(#profilingModeDbmsBtn.hidden) .protocol-toggle-btn:first-child {
+    border-right: none;
+}
+
 .capability-group-title {
     font-size: 0.82em;
     font-weight: 600;

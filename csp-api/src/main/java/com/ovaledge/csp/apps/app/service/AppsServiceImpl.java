@@ -4,10 +4,17 @@ import com.ovaledge.csp.v3.core.apps.model.request.ContainersRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.EdgiConnectorObjectRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.FieldsRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.ObjectRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.ProfileBatchRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.ProfileColumnRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.FileProfileRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.ProfileRowCountRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.QueryRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.SampleProfileRequest;
+import com.ovaledge.csp.v3.core.apps.exceptions.ProfilingUnsupportedException;
 import com.ovaledge.csp.v3.core.apps.model.response.*;
 import com.ovaledge.csp.v3.core.apps.service.AppsConnector;
 import com.ovaledge.csp.v3.core.apps.service.MetadataService;
+import com.ovaledge.csp.v3.core.apps.service.ProfilingService;
 import com.ovaledge.csp.v3.core.apps.service.QueryService;
 import com.ovaledge.csp.v3.core.model.ConnectionConfig;
 import com.ovaledge.csp.v3.core.apps.model.response.ValidateConnectionResponse;
@@ -15,6 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
 
 /**
  * Implementation of the AppsService interface.
@@ -112,6 +121,87 @@ public class AppsServiceImpl implements AppsService {
         } catch (Exception e) {
             logger.error("Failed to execute query: {}", e.getMessage(), e);
             throw new RuntimeException("Query execution failed", e);
+        }
+    }
+
+    /**
+     * Resolves the connector's {@link ProfilingService}.
+     *
+     * @throws ProfilingUnsupportedException when the connector does not implement profiling
+     *         ({@code getProfilingService()} is {@code null}). csp-api maps this to HTTP 400.
+     */
+    private ProfilingService requireProfilingService(ConnectionConfig config) {
+        AppsConnector connector = getConnector(config.getServerType());
+        ProfilingService profilingService = connector.getProfilingService();
+        if (profilingService == null) {
+            throw new ProfilingUnsupportedException(
+                    "Profiling is not supported for serverType: " + config.getServerType());
+        }
+        return profilingService;
+    }
+
+    @Override
+    public long getRowCount(ProfileRowCountRequest request) {
+        try {
+            return requireProfilingService(request.getConnectionConfig()).getRowCount(request);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Failed to get row count: {}", e.getMessage());
+            logger.debug("Failed to get row count", e);
+            throw new RuntimeException("Row count failed", e);
+        }
+    }
+
+    @Override
+    public ProfileColumnResult profileColumn(ProfileColumnRequest request) {
+        try {
+            return requireProfilingService(request.getConnectionConfig()).profileColumn(request);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Failed to profile column: {}", e.getMessage());
+            logger.debug("Failed to profile column", e);
+            throw new RuntimeException("Column profiling failed", e);
+        }
+    }
+
+    @Override
+    public Map<String, ProfileColumnResult> sampleProfile(SampleProfileRequest request) {
+        try {
+            return requireProfilingService(request.getConnectionConfig()).sampleProfile(request);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Failed to sample profile: {}", e.getMessage());
+            logger.debug("Failed to sample profile", e);
+            throw new RuntimeException("Sample profiling failed", e);
+        }
+    }
+
+    @Override
+    public ProfileBatchResponse profileBatch(ProfileBatchRequest request) {
+        try {
+            return requireProfilingService(request.getConnectionConfig()).profileBatch(request);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Failed to batch profile: {}", e.getMessage());
+            logger.debug("Failed to batch profile", e);
+            throw new RuntimeException("Batch profiling failed", e);
+        }
+    }
+
+    @Override
+    public FileProfileResponse profileFile(FileProfileRequest request) {
+        try {
+            return requireProfilingService(request.getConnectionConfig()).profileFile(request);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Failed to profile file: {}", e.getMessage());
+            logger.debug("Failed to profile file", e);
+            throw new RuntimeException("File profiling failed", e);
         }
     }
 

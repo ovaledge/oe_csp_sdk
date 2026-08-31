@@ -10,6 +10,8 @@ public class ConnectorGeneratorRequest {
     private List<String> objectKinds;
     private ManifestInput manifest;
     private List<ReferenceInput> references;
+    /** DBMS or SAMPLE when profiling enabled; null/ignored when profiling false. */
+    private String profilingMode;
 
     public ConnectorGeneratorRequest() {
     }
@@ -60,6 +62,14 @@ public class ConnectorGeneratorRequest {
 
     public void setReferences(List<ReferenceInput> references) {
         this.references = references;
+    }
+
+    public String getProfilingMode() {
+        return profilingMode;
+    }
+
+    public void setProfilingMode(String profilingMode) {
+        this.profilingMode = profilingMode;
     }
 
     public static class ManifestInput {

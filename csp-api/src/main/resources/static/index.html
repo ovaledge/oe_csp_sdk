@@ -93,6 +93,41 @@
                     </div>
                 </div>
 
+                <!-- Profiling Operations Section (compact) -->
+                <div class="section section-compact hidden" id="profilingSection">
+                    <div class="metadata-header">
+                        <h2>Profiling Operations</h2>
+                        <span class="metadata-ops-hint">Requires connection; gated per profiling operation.</span>
+                    </div>
+                    <div class="actions-grid actions-grid-compact" id="profilingOpsGrid">
+                        <button class="action-btn" id="profilingBtnRowCount" disabled
+                            title="Profiling not supported for this connector"
+                            onclick="showProfilingInputModal('rowCount')">
+                            Profile Row Count
+                        </button>
+                        <button class="action-btn" id="profilingBtnColumn" disabled
+                            title="Profiling not supported for this connector"
+                            onclick="showProfilingInputModal('column')">
+                            Profile Column
+                        </button>
+                        <button class="action-btn" id="profilingBtnSample" disabled
+                            title="Profiling not supported for this connector"
+                            onclick="showProfilingInputModal('sample')">
+                            Sample Profile
+                        </button>
+                        <button class="action-btn" id="profilingBtnBatch" disabled
+                            title="Profiling not supported for this connector"
+                            onclick="showProfilingInputModal('batch')">
+                            Profile Batch
+                        </button>
+                        <button class="action-btn hidden" id="profilingBtnFile" disabled
+                            title="Profile File requires FILE in Supported Objects"
+                            onclick="showProfilingInputModal('file')">
+                            Profile File
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Modal for Metadata Inputs -->
                 <div id="metadataModal" class="modal hidden">
                     <div class="modal-content">
@@ -107,6 +142,24 @@
                             <button class="action-btn secondary" onclick="closeMetadataModal()">Cancel</button>
                             <button class="action-btn" id="modalSubmitBtn"
                                 onclick="submitMetadataModal()">Submit</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal for Profiling Inputs -->
+                <div id="profilingModal" class="modal hidden">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="profilingModalTitle">Enter Parameters</h3>
+                            <button class="modal-close" onclick="closeProfilingModal()">&times;</button>
+                        </div>
+                        <div class="modal-body" id="profilingModalBody">
+                            <!-- Dynamic form fields will be inserted here -->
+                        </div>
+                        <div class="modal-footer">
+                            <button class="action-btn secondary" onclick="closeProfilingModal()">Cancel</button>
+                            <button class="action-btn" id="profilingModalSubmitBtn"
+                                onclick="submitProfilingModal()">Submit</button>
                         </div>
                     </div>
                 </div>
@@ -215,8 +268,23 @@
                                     <div class="capability-grid">
                                         <label class="capability-item" data-tooltip="Enables metadata crawling for supported connector objects."><input type="checkbox" id="cmCrawlingInput" checked> <span>Crawling</span></label>
                                         <label class="capability-item" data-tooltip="Enables Query Sheet features for this connector."><input type="checkbox" id="cmQuerySheetInput" checked> <span>Query Sheet</span></label>
-                                        <label class="capability-item capability-item-readonly" data-tooltip="Profiling is currently not supported for SDK connectors."><input type="checkbox" disabled> <span>Profiling (Not supported for SDK connectors)</span></label>
+                                        <label class="capability-item" data-tooltip="Enables profiling capability and generates ProfilingService when selected."><input type="checkbox" id="cmProfilingInput" onchange="onGeneratorProfilingToggle()"> <span>Profiling</span></label>
                                         <label class="capability-item capability-item-readonly" data-tooltip="Data Quality is currently not supported for SDK connectors."><input type="checkbox" disabled> <span>Data Quality (Not supported for SDK connectors)</span></label>
+                                    </div>
+                                    <div id="profilingModeGroup" class="profiling-mode-group hidden">
+                                        <div class="profiling-mode-row">
+                                            <span class="profiling-mode-label">Mode</span>
+                                            <div id="profilingModeToggle" class="protocol-toggle" role="radiogroup" aria-label="Profiling mode">
+                                                <button type="button" class="protocol-toggle-btn active" data-value="SAMPLE"
+                                                        title="PROFILE_TYPES Sample (S): sampleProfile skeleton"
+                                                        onclick="setGeneratorProfilingMode('SAMPLE')">Sample only</button>
+                                                <button type="button" class="protocol-toggle-btn" id="profilingModeDbmsBtn" data-value="DBMS"
+                                                        title="PROFILE_TYPES Auto (A) + Sample (S) [+ Query (Q) for JDBC]: available for JDBC or File object kinds"
+                                                        onclick="setGeneratorProfilingMode('DBMS')">Auto + Sample</button>
+                                            </div>
+                                            <input type="hidden" id="profilingModeInput" value="SAMPLE">
+                                        </div>
+                                        <div id="profilingModeHint" class="help-text profiling-mode-hint" aria-live="polite"></div>
                                     </div>
                                 </div>
                                 <div class="form-group">

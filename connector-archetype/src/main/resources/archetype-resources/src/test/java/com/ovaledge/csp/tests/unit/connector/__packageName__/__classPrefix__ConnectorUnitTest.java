@@ -8,7 +8,7 @@ import com.ovaledge.csp.apps.${packageName}.constants.${classPrefix}Constants;
 import com.ovaledge.csp.apps.${packageName}.main.${classPrefix}Connector;
 import com.ovaledge.csp.apps.${packageName}.main.${classPrefix}MetadataService;
 import com.ovaledge.csp.apps.${packageName}.main.${classPrefix}QueryService;
-import com.ovaledge.csp.dto.model.ConnectionAttribute;
+${profilingServiceConnectorImport}import com.ovaledge.csp.dto.model.ConnectionAttribute;
 import com.ovaledge.csp.v3.core.apps.model.response.ValidateConnectionResponse;
 import com.ovaledge.csp.v3.core.apps.service.MetadataService;
 import com.ovaledge.csp.v3.core.apps.service.QueryService;
@@ -60,7 +60,7 @@ class ${classPrefix}ConnectorUnitTest {
         assertNotNull(attributes);
         assertTrue(!attributes.isEmpty());
     }
-
+${profilingServiceConnectorTest}
     // TODO: add tests for exchangeAttributes_returnsMappedConnInfo.
     // TODO: add tests for exchangeAttributes_returnsMappedAttributes.
     // TODO: add tests for getExtendedAttributes_returnsConnectorAttributes.
