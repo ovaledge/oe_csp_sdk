@@ -58,5 +58,6 @@ Store the completed document in your connector module (for example, `docs/<conne
 10. [Definition of Done and Success Criteria](sdk/10.Definition_of_Done_and_Success_Criteria.md)
 11. [Summary](sdk/11.Summary.md)
 12. [SDK Troubleshooting Guide](sdk/12.SDK_Troubleshooting_Guide.md)
+13. [Implementing Profiling Support (Optional)](sdk/13.Implementing_Profiling_Support.md)
 
 ---
