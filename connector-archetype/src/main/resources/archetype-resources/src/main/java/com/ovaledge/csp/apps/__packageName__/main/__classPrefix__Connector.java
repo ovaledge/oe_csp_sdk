@@ -10,7 +10,7 @@ import com.ovaledge.csp.v3.core.apps.service.BaseAppConnector;
 import com.ovaledge.csp.v3.core.apps.service.SdkConnector;
 import com.ovaledge.csp.v3.core.apps.service.MetadataService;
 import com.ovaledge.csp.v3.core.apps.service.QueryService;
-import com.ovaledge.csp.v3.core.model.ConnectionConfig;
+${profilingServiceImport}import com.ovaledge.csp.v3.core.model.ConnectionConfig;
 import com.ovaledge.csp.vo.SecretsManagerVo;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -21,7 +21,7 @@ public class ${classPrefix}Connector extends BaseAppConnector implements AppsCon
 
     private final ${classPrefix}MetadataService metadataService = new ${classPrefix}MetadataService();
     private final ${classPrefix}QueryService queryService = new ${classPrefix}QueryService();
-
+${profilingServiceField}
     @Override
     public String getServerType() {
         return ${classPrefix}Constants.SERVER_TYPE;
@@ -44,7 +44,7 @@ public class ${classPrefix}Connector extends BaseAppConnector implements AppsCon
     public QueryService getQueryService() {
         return queryService;
     }
-
+${profilingServiceGetter}
     @Override
     public Map<String, ConnectionAttribute> getAttributes() {
 

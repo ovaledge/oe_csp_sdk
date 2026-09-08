@@ -19,10 +19,15 @@ window.CONNECTOR_UI_CONSTANTS = {
     API_BASE: '/v1',
     CONNECTOR_LIST_INITIAL_COUNT: 5,
     CRAWLER_OPTION_TYPE_ORDER: ['CRAWLER_OPTIONS', 'CRAWL_TYPES', 'CRAWLER_PREFERENCE', 'PROFILE_OPTIONS', 'PROFILE_TYPES'],
-    // TODO: Enable PROFILE_OPTIONS and PROFILE_TYPES in UI once SDK connector support is implemented.
-    CRAWLER_OPTION_TYPES_HIDDEN_FOR_SDK: ['PROFILE_OPTIONS', 'PROFILE_TYPES'],
+    // PROFILE_OPTIONS / PROFILE_TYPES enabled when generator Profiling capability is checked.
+    CRAWLER_OPTION_TYPES_HIDDEN_FOR_SDK: [],
     // TODO: Enable these CRAWLER_OPTIONS in UI once SDK connector support is implemented.
     CRAWLER_OPTION_CODES_HIDDEN_FOR_SDK: ['QP', 'OF', 'VF', 'AC', 'DF', 'DC', 'STZ', 'SC', 'FFT', 'UR'],
+    PROFILE_TYPES_DBMS_ALLOW: ['A', 'S', 'D', 'Q'],
+    PROFILE_TYPES_SAMPLE_ALLOW: ['S', 'D'],
+    /** Non-JDBC + File object kind: Auto/Sample optional (no Query). */
+    PROFILE_TYPES_FILE_DBMS_ALLOW: ['A', 'S', 'D'],
+    PROFILE_TYPES_UNSUPPORTED_IN_GENERATOR: ['MR', 'QA', 'DEEP', 'RS'],
     CRAWLER_OPTION_CATALOG: [
         { code: 'TVC', name: 'Tables, Views & Columns', optionType: 'CRAWLER_OPTIONS', category: 'Core', description: 'Tables, Views & Columns support', defaultChecked: true },
         { code: 'RS', name: 'Relationships', optionType: 'CRAWLER_OPTIONS', category: 'Core', description: 'Relationship support' },
@@ -50,7 +55,7 @@ window.CONNECTOR_UI_CONSTANTS = {
         { code: 'FC', name: 'Full Crawl', optionType: 'CRAWL_TYPES', category: 'Crawling', description: 'Full Crawl support', defaultChecked: true },
         { code: 'INC', name: 'Incremental Crawl', optionType: 'CRAWL_TYPES', category: 'Crawling', description: 'Incremental Crawl support (Not supported for SDK connectors)', disabled: true },
         { code: 'C', name: 'CRAWL', optionType: 'CRAWLER_PREFERENCE', category: 'Crawler Preference', description: 'Crawl functionality', required: true },
-        { code: 'P', name: 'PROFILE', optionType: 'CRAWLER_PREFERENCE', category: 'Crawler Preference', description: 'Profile functionality (Not supported for SDK connectors)', disabled: true },
+        { code: 'P', name: 'PROFILE', optionType: 'CRAWLER_PREFERENCE', category: 'Crawler Preference', description: 'Profile preference (forced on when Profiling capability is enabled)' },
         { code: 'S', name: 'SETTING', optionType: 'CRAWLER_PREFERENCE', category: 'Crawler Preference', description: 'Setting functionality', required: true },
         { code: 'BL', name: 'BUILD_LINEAGE', optionType: 'CRAWLER_PREFERENCE', category: 'Crawler Preference', description: 'Build Lineage functionality (Not supported for SDK connectors)', disabled: true },
         { code: 'UN', name: 'USER_NOTIF', optionType: 'CRAWLER_PREFERENCE', category: 'Crawler Preference', description: 'User Notification functionality' },
@@ -82,7 +87,7 @@ window.CONNECTOR_UI_CONSTANTS = {
         FC: 'Runs full crawl mode (complete metadata scan). Use for initial onboarding and broad refresh.',
         INC: 'Runs incremental crawl mode (delta-only updates). Intended for efficient periodic refresh, not yet supported for SDK connectors.',
         C: 'Enables crawl operations in the connector capabilities.',
-        P: 'Enables profile operations in connector preferences (not supported for SDK connectors).',
+        P: 'Enables profile operations in connector preferences. Forced on when the Profiling capability is enabled.',
         S: 'Enables settings/preferences operations for crawler behavior.',
         BL: 'Build-lineage preference toggle; reserved for future SDK support.',
         UN: 'Controls user-notification preference behavior for crawl-related actions.'

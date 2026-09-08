@@ -7,9 +7,15 @@ import com.ovaledge.csp.v3.core.apps.model.request.ContainersRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.EdgiConnectorObjectRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.FieldsRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.ObjectRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.ProfileBatchRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.ProfileColumnRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.FileProfileRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.ProfileRowCountRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.QueryRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.SampleProfileRequest;
 import com.ovaledge.csp.v3.core.apps.model.response.*;
 import com.ovaledge.csp.v3.core.model.ConnectionConfig;
+import com.ovaledge.csp.v3.core.apps.exceptions.ProfilingUnsupportedException;
 import com.ovaledge.csp.v3.core.apps.model.response.ValidateConnectionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 
 /**
  * REST Controller for Apps Connector Operations V1 API.
@@ -288,6 +295,85 @@ public class AppsConnectorController {
         };
     }
 
+    /**
+     * Row count for a table/object. Returns 400 when profiling is unsupported
+     * ({@code getProfilingService()} is null, or the connector rejects the kind/op).
+     *
+     * @param request must include {@code connectionConfig} and {@code objectKind}
+     */
+    @PostMapping("/profiling/row-count")
+    public Callable<ResponseEntity<?>> getRowCount(@RequestBody ProfileRowCountRequest request) {
+        return () -> {
+            if (request == null || request.getConnectionConfig() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Request body with connectionConfig is required.");
+            }
+            return profilingOkOrError("getting row count",
+                    () -> Map.of("rowCount", appsService.getRowCount(request)));
+        };
+    }
+
+    /**
+     * Aggregate column profile. Soft skips return a flagged result; unsupported is HTTP 400.
+     *
+     * @param request must include {@code connectionConfig}, {@code objectKind}, and {@code fieldName}
+     */
+    @PostMapping("/profiling/column")
+    public Callable<ResponseEntity<?>> profileColumn(@RequestBody ProfileColumnRequest request) {
+        return () -> {
+            if (request == null || request.getConnectionConfig() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Request body with connectionConfig is required.");
+            }
+            return profilingOkOrError("profiling column", () -> appsService.profileColumn(request));
+        };
+    }
+
+    /**
+     * Sample profile for an object. Map key in the body is field name.
+     *
+     * @param request must include {@code connectionConfig} and {@code objectKind}
+     */
+    @PostMapping("/profiling/sample")
+    public Callable<ResponseEntity<?>> sampleProfile(@RequestBody SampleProfileRequest request) {
+        return () -> {
+            if (request == null || request.getConnectionConfig() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Request body with connectionConfig is required.");
+            }
+            return profilingOkOrError("sample profiling", () -> appsService.sampleProfile(request));
+        };
+    }
+
+    /**
+     * File profile. Default connector implementations return 400 (unsupported);
+     * live CSV/Excel parse is connector-owned and not provided by the SPI default.
+     *
+     * @param request must include {@code connectionConfig}; use {@code objectKind=FILE}
+     */
+    @PostMapping("/profiling/file")
+    public Callable<ResponseEntity<?>> profileFile(@RequestBody FileProfileRequest request) {
+        return () -> {
+            if (request == null || request.getConnectionConfig() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("Request body with connectionConfig is required.");
+            }
+            return profilingOkOrError("profiling file", () -> appsService.profileFile(request));
+        };
+    }
+
+    /**
+     * Batch profile. {@code batchMode} is {@code ROW_COUNT}, {@code COLUMN}, {@code SAMPLE}, or {@code BOTH}.
+     *
+     * @param request must include {@code connectionConfig} and {@code targets}
+     */
+    @PostMapping("/profiling/batch")
+    public Callable<ResponseEntity<?>> profileBatch(@RequestBody ProfileBatchRequest request) {
+        return () -> {
+            if (request == null || request.getConnectionConfig() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Request body with connectionConfig is required.");
+            }
+            return profilingOkOrError("batch profiling", () -> appsService.profileBatch(request));
+        };
+    }
+
     @PostMapping("/edgi/ask")
     public Callable<ResponseEntity<EdgiConnectorObjectResponse>> askEdgi(@RequestBody AskEdgiRequest request) {
         return () -> {
@@ -429,6 +515,7 @@ public class AppsConnectorController {
             Map<String, Object> result = new HashMap<>();
             result.put("serverType", serverType);
             result.put("attributes", serializableAttributes);
+            result.put("profilingSupported", connector.getProfilingService() != null);
             
             return () -> ResponseEntity.ok(result);
         } catch (Exception e) {
@@ -517,5 +604,24 @@ public class AppsConnectorController {
     private static ResourceAndType tryResource(String classpathLocation, MediaType contentType) {
         ClassPathResource resource = new ClassPathResource(classpathLocation);
         return resource.exists() ? new ResourceAndType(resource, contentType) : null;
+    }
+
+    /**
+     * Runs a profiling call. {@link ProfilingUnsupportedException} → 400; any other exception → 500.
+     */
+    private ResponseEntity<?> profilingOkOrError(String operation, Supplier<Object> body) {
+        try {
+            return ResponseEntity.ok(body.get());
+        } catch (ProfilingUnsupportedException e) {
+            logger.warn("Profiling unsupported for {}: {}", operation, e.getMessage());
+            logger.debug("Profiling unsupported for {}", operation, e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", e.getMessage() != null ? e.getMessage() : "profiling not supported"));
+        } catch (Exception e) {
+            logger.error("Error {}: {}", operation, e.getMessage());
+            logger.debug("Error {}", operation, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", e.getMessage() != null ? e.getMessage() : operation + " failed"));
+        }
     }
 }

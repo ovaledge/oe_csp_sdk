@@ -11,6 +11,10 @@ const {
     CONNECTOR_OBJECT_CATEGORY_TOOLTIPS,
     CONNECTOR_OBJECT_CRAWLER_OPTION_SYNC,
     PRIMARY_OBJECT_OPTIONS,
+    PROFILE_TYPES_DBMS_ALLOW,
+    PROFILE_TYPES_SAMPLE_ALLOW,
+    PROFILE_TYPES_FILE_DBMS_ALLOW,
+    PROFILE_TYPES_UNSUPPORTED_IN_GENERATOR,
     getEligiblePrimaryObjectCodes,
     needsPrimaryObjectSelection,
     resolvePrimaryObjectFromKinds
@@ -1072,11 +1076,245 @@ function setManifestProtocol(value) {
     const input = document.getElementById('manifestProtocolInput');
     if (!input) return;
     input.value = value;
-    document.querySelectorAll('.protocol-toggle-btn').forEach(btn => {
+    document.querySelectorAll('.protocol-toggle[aria-label="Protocol"] .protocol-toggle-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.value === value);
     });
     toggleProtocolOtherInput();
+    syncGeneratorProfilingUi();
     updateConnectorGeneratorActionButtons();
+}
+
+function isGeneratorProfilingEnabled() {
+    return !!document.getElementById('cmProfilingInput')?.checked;
+}
+
+function getGeneratorProtocol() {
+    const selected = (document.getElementById('manifestProtocolInput')?.value || '').trim();
+    if (selected === 'Other') {
+        return (document.getElementById('manifestProtocolOtherInput')?.value || '').trim();
+    }
+    return selected;
+}
+
+/** True when Connector Objects include FILE or FILEFOLDERS. */
+function isGeneratorFileObjectKindSelected() {
+    return getSelectedConnectorObjects().some(k => {
+        const u = String(k || '').trim().toUpperCase();
+        return u === 'FILE' || u === 'FILEFOLDERS';
+    });
+}
+
+/**
+ * Auto + Sample (DBMS) mode: JDBC protocol, or File object kind (file connectors).
+ */
+function canUseDbmsProfilingMode() {
+    return getGeneratorProtocol().toUpperCase() === 'JDBC' || isGeneratorFileObjectKindSelected();
+}
+
+function getGeneratorProfilingMode() {
+    if (!isGeneratorProfilingEnabled()) return null;
+    if (!canUseDbmsProfilingMode()) return 'SAMPLE';
+    const stored = (document.getElementById('profilingModeInput')?.value || 'SAMPLE').trim().toUpperCase();
+    return stored === 'DBMS' ? 'DBMS' : 'SAMPLE';
+}
+
+function setGeneratorProfilingMode(mode) {
+    const normalized = String(mode || 'SAMPLE').toUpperCase() === 'DBMS' ? 'DBMS' : 'SAMPLE';
+    if (normalized === 'DBMS' && !canUseDbmsProfilingMode()) {
+        return;
+    }
+    const input = document.getElementById('profilingModeInput');
+    if (input) input.value = normalized;
+    document.querySelectorAll('#profilingModeToggle .protocol-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === normalized);
+    });
+    onGeneratorProfilingModeChange();
+}
+
+function onGeneratorProfilingToggle() {
+    const on = isGeneratorProfilingEnabled();
+    syncGeneratorProfilingUi({ applyTypeDefaults: on, syncProfileOptions: on });
+}
+
+function onGeneratorProfilingModeChange() {
+    applyGeneratorProfilingCatalogState({ applyTypeDefaults: true, syncProfileOptions: false });
+}
+
+function syncGeneratorProfilingUi(opts = {}) {
+    const profilingOn = isGeneratorProfilingEnabled();
+    const modeGroup = document.getElementById('profilingModeGroup');
+    if (modeGroup) {
+        modeGroup.classList.toggle('hidden', !profilingOn);
+    }
+    const protocol = getGeneratorProtocol().toUpperCase();
+    const jdbc = protocol === 'JDBC';
+    const fileKind = isGeneratorFileObjectKindSelected();
+    const dbmsAllowed = jdbc || fileKind;
+    const modeInput = document.getElementById('profilingModeInput');
+    const dbmsBtn = document.getElementById('profilingModeDbmsBtn');
+    const wasDbmsSelected = (modeInput?.value || '').toUpperCase() === 'DBMS';
+
+    if (dbmsBtn) {
+        dbmsBtn.classList.toggle('hidden', !dbmsAllowed);
+        dbmsBtn.title = jdbc
+            ? 'PROFILE_TYPES Auto (A) + Sample (S) + Query (Q): getRowCount, profileColumn, sampleProfile stubs (JDBC)'
+            : 'PROFILE_TYPES Auto (A) + Sample (S): optional for File connectors when the source supports them';
+    }
+    if (!dbmsAllowed && wasDbmsSelected && modeInput) {
+        modeInput.value = 'SAMPLE';
+    }
+    const effectiveMode = (!dbmsAllowed || (modeInput?.value || 'SAMPLE').toUpperCase() !== 'DBMS')
+        ? 'SAMPLE'
+        : 'DBMS';
+    if (modeInput) modeInput.value = effectiveMode;
+    document.querySelectorAll('#profilingModeToggle .protocol-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === effectiveMode);
+    });
+
+    const hint = document.getElementById('profilingModeHint');
+    if (hint) {
+        if (!profilingOn) {
+            hint.textContent = '';
+        } else if (jdbc) {
+            hint.textContent = 'Auto + Sample → PROFILE_TYPES A + S + Q. Sample only → S.';
+        } else if (fileKind) {
+            hint.textContent = 'File object kind: Auto (A) and Sample (S) are optional — check what the source supports. Sample only → S locked.';
+        } else {
+            const proto = protocol || 'this protocol';
+            hint.replaceChildren();
+            hint.appendChild(document.createTextNode(
+                'Auto + Sample is available for JDBC connectors, or when File is a selected object kind. Current protocol: '
+                + proto + '.'
+            ));
+            const switchBtn = document.createElement('button');
+            switchBtn.type = 'button';
+            switchBtn.className = 'profiling-mode-action';
+            switchBtn.textContent = 'Switch Protocol to JDBC';
+            switchBtn.addEventListener('click', () => setManifestProtocol('JDBC'));
+            hint.appendChild(switchBtn);
+        }
+    }
+    const forcedSample = profilingOn && !dbmsAllowed && wasDbmsSelected;
+    applyGeneratorProfilingCatalogState({
+        applyTypeDefaults: !!opts.applyTypeDefaults || forcedSample,
+        syncProfileOptions: !!opts.syncProfileOptions || !!opts.applyTypeDefaults || forcedSample
+    });
+}
+
+function profileTypesAllowList() {
+    const mode = getGeneratorProfilingMode();
+    if (mode === 'DBMS') {
+        if (getGeneratorProtocol().toUpperCase() === 'JDBC') {
+            return new Set(PROFILE_TYPES_DBMS_ALLOW || ['A', 'S', 'D', 'Q']);
+        }
+        // File-enabled Auto + Sample (non-JDBC): Auto/Sample optional, no Query.
+        return new Set(PROFILE_TYPES_FILE_DBMS_ALLOW || ['A', 'S', 'D']);
+    }
+    if (mode === 'SAMPLE') return new Set(PROFILE_TYPES_SAMPLE_ALLOW || ['S', 'D']);
+    return new Set();
+}
+
+/**
+ * @param {{applyTypeDefaults?: boolean, syncProfileOptions?: boolean}} opts
+ * applyTypeDefaults — set mode defaults for PROFILE_TYPES (toggle/mode change only)
+ * syncProfileOptions — set TC/VC from selected object kinds
+ */
+function applyGeneratorProfilingCatalogState(opts = {}) {
+    const applyTypeDefaults = !!opts.applyTypeDefaults;
+    const syncProfileOptions = !!opts.syncProfileOptions;
+    const profilingOn = isGeneratorProfilingEnabled();
+    const mode = getGeneratorProfilingMode();
+    const allow = profileTypesAllowList();
+    const unsupported = new Set(PROFILE_TYPES_UNSUPPORTED_IN_GENERATOR || []);
+    const selectedKinds = getSelectedConnectorObjects().map(k => String(k || '').toUpperCase());
+
+    document.querySelectorAll('.crawler-option-checkbox').forEach(input => {
+        const optionType = input.dataset.optionType || '';
+        const optionKey = input.dataset.optionKey || '';
+        const label = input.closest('label');
+
+        if (optionType === 'CRAWLER_PREFERENCE' && optionKey === 'P') {
+            if (profilingOn) {
+                input.checked = true;
+                input.disabled = true;
+                if (label) label.classList.add('capability-item-readonly');
+            } else {
+                input.checked = false;
+                input.disabled = true;
+                if (label) label.classList.add('capability-item-readonly');
+            }
+            return;
+        }
+
+        if (optionType === 'PROFILE_OPTIONS' || optionType === 'PROFILE_TYPES') {
+            if (!profilingOn) {
+                input.checked = false;
+                input.disabled = true;
+                if (label) {
+                    label.classList.add('capability-item-readonly');
+                    label.classList.add('hidden');
+                }
+                return;
+            }
+            if (label) label.classList.remove('hidden');
+
+            if (optionType === 'PROFILE_TYPES') {
+                const jdbc = getGeneratorProtocol().toUpperCase() === 'JDBC';
+                const fileDbmsOptional = mode === 'DBMS' && !jdbc && isGeneratorFileObjectKindSelected();
+                // Disabled is always selected and locked for every profiling combination.
+                if (optionKey === 'D') {
+                    input.checked = true;
+                    input.disabled = true;
+                    if (label) label.classList.add('capability-item-readonly');
+                    return;
+                }
+                // Sample only: S is required and locked (same pattern as preference P).
+                // File Auto+Sample: A and S stay optional checkboxes.
+                if (mode === 'SAMPLE' && optionKey === 'S') {
+                    input.checked = true;
+                    input.disabled = true;
+                    if (label) label.classList.add('capability-item-readonly');
+                    return;
+                }
+                const allowed = allow.has(optionKey) && !unsupported.has(optionKey);
+                input.disabled = !allowed;
+                if (!allowed) {
+                    input.checked = false;
+                    if (label) label.classList.add('capability-item-readonly');
+                } else {
+                    if (label) label.classList.remove('capability-item-readonly');
+                    if (applyTypeDefaults) {
+                        if (!fileDbmsOptional) {
+                            if (optionKey === 'S') input.checked = true;
+                            if (optionKey === 'A' && mode === 'DBMS') input.checked = true;
+                        }
+                    }
+                }
+                return;
+            }
+
+            // PROFILE_OPTIONS
+            input.disabled = false;
+            if (label) label.classList.remove('capability-item-readonly');
+            if (syncProfileOptions) {
+                if (optionKey === 'TC') {
+                    input.checked = selectedKinds.includes('ENTITY');
+                } else if (optionKey === 'VC') {
+                    input.checked = selectedKinds.includes('VIEW');
+                }
+            }
+        }
+    });
+
+    // Hide empty PROFILE_* sections visually when profiling off
+    document.querySelectorAll('.crawler-type-section').forEach(section => {
+        const title = section.querySelector('.crawler-type-title');
+        if (!title) return;
+        const t = (title.textContent || '').replace(/\s+/g, '_');
+        if (t === 'PROFILE_OPTIONS' || t === 'PROFILE_TYPES') {
+            section.classList.toggle('hidden', !profilingOn);
+        }
+    });
 }
 
 function renderCrawlerOptionsCatalog() {
@@ -1139,6 +1377,8 @@ function renderCrawlerOptionsCatalog() {
         section.appendChild(grid);
         container.appendChild(section);
     });
+    const profilingOn = isGeneratorProfilingEnabled();
+    syncGeneratorProfilingUi({ applyTypeDefaults: profilingOn, syncProfileOptions: profilingOn });
 }
 
 function buildCrawlerOptionTooltip(item) {
@@ -1148,21 +1388,32 @@ function buildCrawlerOptionTooltip(item) {
     return base + unsupported + ' [' + item.optionType + ' | ' + item.category + ']';
 }
 
-function buildCrawlerOptionsFromForm() {
+function buildCrawlerOptionsFromForm(profilingEnabled) {
     const options = [];
     const dedupe = new Set();
     document.querySelectorAll('.crawler-option-checkbox:checked').forEach(input => {
         const optionType = (input.dataset.optionType || '').trim();
         const optionKey = (input.dataset.optionKey || '').trim();
         if (!optionType || !optionKey) return;
+        if (!profilingEnabled && (optionType === 'PROFILE_OPTIONS' || optionType === 'PROFILE_TYPES'
+                || (optionType === 'CRAWLER_PREFERENCE' && optionKey === 'P'))) {
+            return;
+        }
         const token = optionType + ':' + optionKey;
         if (dedupe.has(token)) return;
         dedupe.add(token);
         options.push({ optionType, optionKey });
     });
-    // Keep mandatory crawler preferences always present.
     if (!dedupe.has('CRAWLER_PREFERENCE:S')) options.push({ optionType: 'CRAWLER_PREFERENCE', optionKey: 'S' });
     if (!dedupe.has('CRAWLER_PREFERENCE:C')) options.push({ optionType: 'CRAWLER_PREFERENCE', optionKey: 'C' });
+    if (profilingEnabled && !dedupe.has('CRAWLER_PREFERENCE:P')) {
+        options.push({ optionType: 'CRAWLER_PREFERENCE', optionKey: 'P' });
+    }
+    if (!profilingEnabled) {
+        return options.filter(o => o.optionType !== 'PROFILE_OPTIONS'
+            && o.optionType !== 'PROFILE_TYPES'
+            && !(o.optionType === 'CRAWLER_PREFERENCE' && o.optionKey === 'P'));
+    }
     return options;
 }
 
@@ -1215,16 +1466,6 @@ function populateConnectorObjectKinds() {
     actions.appendChild(selectedCount);
     actions.appendChild(clearBtn);
     actions.appendChild(selectAllBtn);
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'dropdown-action-btn close';
-    closeBtn.setAttribute('aria-label', 'Close connector objects selector');
-    closeBtn.textContent = '✕';
-    closeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeConnectorObjectsDropdown();
-    });
-    actions.appendChild(closeBtn);
 
     headerRow.appendChild(searchInput);
     headerRow.appendChild(actions);
@@ -1470,6 +1711,9 @@ function syncCrawlerOptionsFromConnectorObjects() {
             }
         });
     });
+    if (isGeneratorProfilingEnabled()) {
+        syncGeneratorProfilingUi({ applyTypeDefaults: false, syncProfileOptions: true });
+    }
     updateConnectorGeneratorActionButtons();
 }
 
@@ -1608,9 +1852,9 @@ function updateConnectorObjectsDropdownLabel() {
 document.addEventListener('click', event => {
     const dropdown = document.getElementById('connectorObjectsDropdown');
     const menu = document.getElementById('connectorObjectsList');
-    if (!dropdown || !menu) return;
-    if (!dropdown.contains(event.target)) {
-        menu.classList.add('hidden');
+    if (!dropdown || !menu || menu.classList.contains('hidden')) return;
+    if (!dropdown.contains(event.target) && !menu.contains(event.target)) {
+        closeConnectorObjectsDropdown();
     }
 });
 
@@ -1875,7 +2119,42 @@ function collectConnectorGeneratorSubmission(options = {}) {
     }
     if (!manifestProtocol) {
         showConnectorGeneratorError('Protocol is required.');
-        return;
+        return null;
+    }
+
+    const profilingEnabled = isGeneratorProfilingEnabled();
+    let profilingMode = getGeneratorProfilingMode();
+    if (profilingEnabled) {
+        if (!canUseDbmsProfilingMode()) {
+            profilingMode = 'SAMPLE';
+        }
+        const profileTypes = [];
+        document.querySelectorAll('.crawler-option-checkbox[data-option-type="PROFILE_TYPES"]:checked').forEach(input => {
+            if (input.dataset.optionKey) profileTypes.push(input.dataset.optionKey);
+        });
+        const nonDisabled = profileTypes.filter(c => c !== 'D');
+        if (nonDisabled.length === 0) {
+            showConnectorGeneratorError('Profiling requires at least one non-Disabled PROFILE_TYPES selection.');
+            return null;
+        }
+        if (profilingMode === 'SAMPLE' && !profileTypes.includes('S')) {
+            showConnectorGeneratorError('Sample only requires PROFILE_TYPES Sample (S).');
+            return null;
+        }
+        if (profilingMode === 'DBMS' && getGeneratorProtocol().toUpperCase() !== 'JDBC'
+            && isGeneratorFileObjectKindSelected()
+            && !profileTypes.includes('A') && !profileTypes.includes('S')) {
+            showConnectorGeneratorError('File Auto + Sample requires PROFILE_TYPES Auto (A) and/or Sample (S).');
+            return null;
+        }
+        const allow = profileTypesAllowList();
+        const smuggled = profileTypes.filter(c => !allow.has(c));
+        if (smuggled.length > 0) {
+            const msg = 'PROFILE_TYPES outside generator allow-list will still be written to JSON: '
+                + smuggled.join(', ');
+            console.warn(msg);
+            showConnectorToast(msg, 'info');
+        }
     }
 
     const iconFile = iconInput && iconInput.files ? iconInput.files[0] : null;
@@ -1920,6 +2199,7 @@ function collectConnectorGeneratorSubmission(options = {}) {
         repoRoot,
         overwriteExistingModule: false,
         objectKinds: selectedKinds,
+        profilingMode: profilingEnabled ? profilingMode : null,
         manifest: {
             connectorMaster: {
                 oeDocs: '',
@@ -1933,13 +2213,13 @@ function collectConnectorGeneratorSubmission(options = {}) {
                 querySheet: !!document.getElementById('cmQuerySheetInput')?.checked,
                 dataAccess: false,
                 autoLineage: false,
-                profiling: false,
+                profiling: profilingEnabled,
                 dataQuality: false,
                 authenticationTypes: [],
                 credentialManagers: ['DATABASE'],
                 primaryObject: getResolvedPrimaryObject(selectedKinds)
             },
-            crawlerOptions: buildCrawlerOptionsFromForm()
+            crawlerOptions: buildCrawlerOptionsFromForm(profilingEnabled)
         },
         references
     };
@@ -2042,6 +2322,17 @@ function setButtonsState(enabled) {
  * True when every required connection attribute has a non-empty value.
  * "Get Supported Objects" is exempt from this check elsewhere; this only validates completeness.
  */
+let profilingSupported = false;
+const PROFILING_UNSUPPORTED_TITLE = 'Profiling not supported for this connector';
+const CONNECTION_CONFIG_INCOMPLETE_TITLE = 'Complete Connection Configuration to use this action.';
+
+/** Queryable entity types for Execute Query (Tables / Views / Reports). */
+const EXECUTE_QUERY_OBJECT_KINDS = ['ENTITY', 'VIEW', 'REPORT'];
+/** Tabular profiling ops (row count / column / sample / batch): Tables and Views only. */
+const TABULAR_PROFILE_OBJECT_KINDS = ['ENTITY', 'VIEW'];
+/** File profiling: File kind only. */
+const FILE_PROFILE_OBJECT_KINDS = ['FILE'];
+
 function isConnectionConfigComplete() {
     if (!connectorAttributes || typeof connectorAttributes !== 'object') {
         return false;
@@ -2084,7 +2375,7 @@ function applyConnectionConfigGating() {
                 btn.disabled = !filled;
                 btn.style.opacity = filled ? '1' : '0.6';
                 btn.style.cursor = filled ? 'pointer' : 'not-allowed';
-                btn.title = filled ? (btn.dataset.actionDescription || '') : 'Complete Connection Configuration to use this action.';
+                btn.title = filled ? (btn.dataset.actionDescription || '') : CONNECTION_CONFIG_INCOMPLETE_TITLE;
             } else {
                 btn.disabled = false;
                 btn.style.opacity = '1';
@@ -2099,8 +2390,32 @@ function applyConnectionConfigGating() {
             btn.disabled = !filled;
             btn.style.opacity = filled ? '1' : '0.6';
             btn.style.cursor = filled ? 'pointer' : 'not-allowed';
-            btn.title = filled ? '' : 'Complete Connection Configuration to use this action.';
+            btn.title = filled ? '' : CONNECTION_CONFIG_INCOMPLETE_TITLE;
         });
+    }
+    const profilingGrid = document.getElementById('profilingOpsGrid');
+    if (profilingGrid) {
+        profilingGrid.querySelectorAll('button.action-btn').forEach(btn => {
+            if (btn.id === 'profilingBtnFile' && btn.classList.contains('hidden')) {
+                return;
+            }
+            const enabled = profilingSupported && filled;
+            btn.disabled = !enabled;
+            btn.style.opacity = enabled ? '1' : '0.6';
+            btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+            if (!profilingSupported) {
+                btn.title = PROFILING_UNSUPPORTED_TITLE;
+            } else if (!filled) {
+                btn.title = CONNECTION_CONFIG_INCOMPLETE_TITLE;
+            } else {
+                btn.title = '';
+            }
+        });
+    }
+    if (profilingSupported && filled) {
+        ensureSupportedObjectsLoaded().then(() => updateProfilingFileButtonVisibility());
+    } else {
+        updateProfilingFileButtonVisibility();
     }
 }
 
@@ -2357,15 +2672,18 @@ async function selectConnector(serverType) {
         }
 
         connectorAttributes = data.attributes;
+        profilingSupported = data.profilingSupported === true;
         renderConnectionForm(data.attributes);
         renderActions();
         wireConnectionFormForGating();
         applyConnectionConfigGating();
+        setProfilingButtonsEnabled();
 
         document.getElementById('configPlaceholder').classList.add('hidden');
         document.getElementById('configSection').classList.remove('hidden');
         document.getElementById('actionsSection').classList.remove('hidden');
         document.getElementById('metadataSection').classList.remove('hidden');
+        document.getElementById('profilingSection').classList.remove('hidden');
 
         collapseSelectConnectorSection(serverType);
 
@@ -2545,6 +2863,101 @@ function getConnectionConfig() {
 
 function handleSupportedObjectsResponse(data) {
     supportedObjectsData = data;
+    updateProfilingFileButtonVisibility();
+}
+
+/**
+ * True when supported-objects includes FILE (by typeName / ObjectKind).
+ */
+function connectorSupportsFileObjects() {
+    const items = supportedObjectsData && supportedObjectsData.supportedObjects;
+    if (!Array.isArray(items) || items.length === 0) {
+        return false;
+    }
+    return items.some(obj => {
+        const typeName = String(obj.typeName || obj.type || '').trim().toUpperCase();
+        return typeName === 'FILE';
+    });
+}
+
+/**
+ * Show Profile File only when profiling is supported and FILE is among supported objects.
+ * Hidden (not merely disabled) when FILE is not supported.
+ */
+function updateProfilingFileButtonVisibility() {
+    const btn = document.getElementById('profilingBtnFile');
+    if (!btn) {
+        return;
+    }
+    const show = profilingSupported && connectorSupportsFileObjects();
+    btn.classList.toggle('hidden', !show);
+    if (!show) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.style.cursor = 'not-allowed';
+        btn.title = 'Profile File requires FILE in Supported Objects';
+        return;
+    }
+    const filled = isConnectionConfigComplete();
+    const enabled = profilingSupported && filled;
+    btn.disabled = !enabled;
+    btn.style.opacity = enabled ? '1' : '0.6';
+    btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+    if (!profilingSupported) {
+        btn.title = PROFILING_UNSUPPORTED_TITLE;
+    } else if (!filled) {
+        btn.title = CONNECTION_CONFIG_INCOMPLETE_TITLE;
+    } else {
+        btn.title = '';
+    }
+}
+
+/**
+ * Load /metadata/supported-objects once so Profile File gating and kind filters can run.
+ * @returns {Promise<object|null>}
+ */
+async function ensureSupportedObjectsLoaded() {
+    if (supportedObjectsData && Array.isArray(supportedObjectsData.supportedObjects)) {
+        return supportedObjectsData;
+    }
+    if (!selectedConnector || !isConnectionConfigComplete()) {
+        return null;
+    }
+    try {
+        const config = getConnectionConfig();
+        const response = await fetch(`${API_BASE}/metadata/supported-objects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+        if (response.ok) {
+            supportedObjectsData = await response.json();
+            updateProfilingFileButtonVisibility();
+            return supportedObjectsData;
+        }
+    } catch (e) {
+        console.error('Failed to load supported objects for profiling gating', e);
+    }
+    return null;
+}
+
+/**
+ * Filter supported-object entries to an allow-list of ObjectKind typeNames (case-insensitive).
+ * @param {Array} items supportedObjects array
+ * @param {string[]|null} allowKinds e.g. ['ENTITY','VIEW']; null/empty = no filter
+ */
+function filterSupportedObjectsByKinds(items, allowKinds) {
+    if (!Array.isArray(items)) {
+        return [];
+    }
+    if (!allowKinds || allowKinds.length === 0) {
+        return items.slice();
+    }
+    const allow = new Set(allowKinds.map(k => String(k).trim().toUpperCase()));
+    return items.filter(obj => {
+        const typeName = String(obj.typeName || obj.type || '').trim().toUpperCase();
+        return allow.has(typeName);
+    });
 }
 
 function showMetadataInputModal(type) {
@@ -2561,12 +2974,12 @@ function showMetadataInputModal(type) {
         addModalInputWithAction('containerId', 'Container ID (e.g., company ID)', true, fetchContainersForModal);
     } else if (type === 'getFields') {
         modalTitle.textContent = 'Get Fields Parameters';
-        addEntityTypeInput();
+        addEntityTypeInput(EXECUTE_QUERY_OBJECT_KINDS);
         addModalInputWithAction('containerId', 'Container ID', true, fetchContainersForModal);
         addModalInputWithAction('entityId', 'Entity/Object ID (e.g., Customer)', true, fetchObjectsForModal);
     } else if (type === 'executeQuery') {
         modalTitle.textContent = 'Execute Query Parameters';
-        addEntityTypeInput();
+        addEntityTypeInput(EXECUTE_QUERY_OBJECT_KINDS);
         addModalInputWithAction('containerId', 'Container ID', true, fetchContainersForModal);
         addModalInputWithAction('entityId', 'Entity/Object ID', true, fetchObjectsForModal);
         addModalInputWithAction('fields', 'Fields (comma separated, e.g., Id, Name)', false, fetchFieldsForModal);
@@ -2881,13 +3294,16 @@ function addModalSelect(name, label, options, required) {
     modalBody.appendChild(group);
 }
 
-async function addEntityTypeInput() {
+/**
+ * @param {string[]|null} allowKinds optional ObjectKind allow-list (e.g. Execute Query: Tables/Views/Reports)
+ */
+async function addEntityTypeInput(allowKinds) {
     // Always add a select
     addModalSelect('entityType', 'Entity Type', [], true);
     const select = document.getElementById('modal_input_entityType');
 
     if (supportedObjectsData && supportedObjectsData.supportedObjects) {
-        populateEntityTypeSelect(select, supportedObjectsData.supportedObjects);
+        populateEntityTypeSelect(select, filterSupportedObjectsByKinds(supportedObjectsData.supportedObjects, allowKinds));
     } else {
         // Background fetch
         select.options[0].textContent = '-- Loading types... --';
@@ -2904,7 +3320,8 @@ async function addEntityTypeInput() {
             if (response.ok) {
                 const data = await response.json();
                 supportedObjectsData = data;
-                populateEntityTypeSelect(select, data.supportedObjects || []);
+                updateProfilingFileButtonVisibility();
+                populateEntityTypeSelect(select, filterSupportedObjectsByKinds(data.supportedObjects || [], allowKinds));
                 select.disabled = false;
                 select.options[0].textContent = ' Select Entity Type ';
             } else {
@@ -3016,6 +3433,680 @@ async function submitMetadataModal() {
     executeAction(action);
 }
 
+// --- Profiling Operations ---
+let currentProfilingActionType = null;
+
+function setProfilingButtonsEnabled() {
+    applyConnectionConfigGating();
+}
+
+function showProfilingInputModal(type) {
+    if (!profilingSupported) {
+        showError(PROFILING_UNSUPPORTED_TITLE);
+        return;
+    }
+    if (!isConnectionConfigComplete()) {
+        showError(CONNECTION_CONFIG_INCOMPLETE_TITLE);
+        return;
+    }
+    currentProfilingActionType = type;
+    const modal = document.getElementById('profilingModal');
+    const modalTitle = document.getElementById('profilingModalTitle');
+    const modalBody = document.getElementById('profilingModalBody');
+    modalBody.innerHTML = '';
+
+    if (type === 'rowCount') {
+        modalTitle.textContent = 'Profile Row Count';
+        addProfilingEntityTypeInput(null, TABULAR_PROFILE_OBJECT_KINDS);
+        addProfilingModalInputWithAction('containerId', 'Container ID', true, fetchContainersForProfilingModal);
+        addProfilingModalInputWithAction('entityId', 'Entity/Object ID', true, fetchObjectsForProfilingModal);
+    } else if (type === 'column') {
+        modalTitle.textContent = 'Profile Column';
+        addProfilingEntityTypeInput(null, TABULAR_PROFILE_OBJECT_KINDS);
+        addProfilingModalInputWithAction('containerId', 'Container ID', true, fetchContainersForProfilingModal);
+        addProfilingModalInputWithAction('entityId', 'Entity/Object ID', true, fetchObjectsForProfilingModal);
+        addProfilingFieldPicker(false);
+        addProfilingModalInput('dataType', 'Data Type (auto-filled; override allowed)', true);
+        addProfilingModalInput('dataLength', 'Data Length (optional)', false, 'number');
+    } else if (type === 'sample') {
+        modalTitle.textContent = 'Sample Profile';
+        addProfilingEntityTypeInput(null, TABULAR_PROFILE_OBJECT_KINDS);
+        addProfilingModalInputWithAction('containerId', 'Container ID', true, fetchContainersForProfilingModal);
+        addProfilingModalInputWithAction('entityId', 'Entity/Object ID', true, fetchObjectsForProfilingModal);
+        addProfilingFieldPicker(true);
+    } else if (type === 'batch') {
+        modalTitle.textContent = 'Profile Batch (single table)';
+        addProfilingEntityTypeInput(null, TABULAR_PROFILE_OBJECT_KINDS);
+        addProfilingModalInputWithAction('containerId', 'Container ID', true, fetchContainersForProfilingModal);
+        addProfilingModalInputWithAction('entityId', 'Entity/Object ID', true, fetchObjectsForProfilingModal);
+        addProfilingModalSelect('batchMode', 'Batch Mode', [
+            { value: 'ROW_COUNT', label: 'ROW_COUNT' },
+            { value: 'COLUMN', label: 'COLUMN' },
+            { value: 'SAMPLE', label: 'SAMPLE' },
+            { value: 'BOTH', label: 'BOTH (row count + column)' }
+        ], true);
+        const batchModeSelect = document.getElementById('prof_modal_input_batchMode');
+        if (batchModeSelect) {
+            batchModeSelect.value = 'COLUMN';
+            batchModeSelect.addEventListener('change', updateProfilingBatchFieldsVisibility);
+        }
+        addProfilingFieldPicker(true);
+        updateProfilingBatchFieldsVisibility();
+    } else if (type === 'file') {
+        modalTitle.textContent = 'Profile File';
+        addProfilingEntityTypeInput('FILE', FILE_PROFILE_OBJECT_KINDS);
+        addProfilingModalInputWithAction('containerId', 'Container ID', true, fetchContainersForProfilingModal);
+        addProfilingModalInputWithAction('entityId', 'Entity/Object ID', true, fetchObjectsForProfilingModal);
+        addProfilingModalInput('location', 'Location / path', true);
+        addProfilingModalInput('extRefId', 'Ext Ref ID (optional)', false);
+        addProfilingModalInput('sheetName', 'Sheet name (optional)', false);
+        addProfilingModalInput('alternateExtType', 'Alternate extension (optional)', false);
+        addProfilingModalSelect('hasHeaders', 'Has header row', [
+            { value: 'false', label: 'No' },
+            { value: 'true', label: 'Yes' }
+        ], false);
+        addProfilingModalSelect('dataLakeFolder', 'Data-lake folder', [
+            { value: 'false', label: 'No' },
+            { value: 'true', label: 'Yes' }
+        ], false);
+        const hasHeadersSelect = document.getElementById('prof_modal_input_hasHeaders');
+        if (hasHeadersSelect) hasHeadersSelect.value = 'false';
+        const dataLakeSelect = document.getElementById('prof_modal_input_dataLakeFolder');
+        if (dataLakeSelect) dataLakeSelect.value = 'false';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function updateProfilingBatchFieldsVisibility() {
+    const batchModeEl = document.getElementById('prof_modal_input_batchMode');
+    const fieldsGroup = document.getElementById('prof_fields_picker_group');
+    if (!fieldsGroup) return;
+    const mode = batchModeEl ? batchModeEl.value : 'COLUMN';
+    const needsFields = mode === 'COLUMN' || mode === 'BOTH' || mode === 'SAMPLE';
+    fieldsGroup.style.display = needsFields ? '' : 'none';
+    const select = document.getElementById('prof_modal_input_fields');
+    if (select) select.required = needsFields;
+}
+
+function closeProfilingModal() {
+    document.getElementById('profilingModal').classList.add('hidden');
+}
+
+function addProfilingModalInput(name, label, required, type = 'text') {
+    const modalBody = document.getElementById('profilingModalBody');
+    const group = document.createElement('div');
+    group.className = 'form-group';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label + (required ? ' *' : '');
+
+    const input = document.createElement('input');
+    input.type = type;
+    input.id = `prof_modal_input_${name}`;
+    input.name = name;
+    if (required) input.required = true;
+
+    group.appendChild(lbl);
+    group.appendChild(input);
+    modalBody.appendChild(group);
+}
+
+function addProfilingModalInputWithAction(name, label, required, actionFn, icon = '🔄') {
+    const modalBody = document.getElementById('profilingModalBody');
+    const group = document.createElement('div');
+    group.className = 'form-group';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label + (required ? ' *' : '');
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'input-with-action';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = `prof_modal_input_${name}`;
+    input.name = name;
+    input.placeholder = label;
+    if (required) input.required = true;
+
+    const btn = document.createElement('button');
+    btn.className = 'icon-btn';
+    btn.innerHTML = icon;
+    btn.title = `Fetch ${label}`;
+    btn.type = 'button';
+    btn.onclick = () => actionFn(input, btn);
+
+    wrapper.appendChild(input);
+    wrapper.appendChild(btn);
+    group.appendChild(lbl);
+    group.appendChild(wrapper);
+    modalBody.appendChild(group);
+}
+
+function addProfilingModalSelect(name, label, options, required) {
+    const modalBody = document.getElementById('profilingModalBody');
+    const group = document.createElement('div');
+    group.className = 'form-group';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = label + (required ? ' *' : '');
+
+    const select = document.createElement('select');
+    select.id = `prof_modal_input_${name}`;
+    select.name = name;
+    if (required) select.required = true;
+
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = `-- Select ${label} --`;
+    select.appendChild(defaultOpt);
+
+    options.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt.value;
+        o.textContent = opt.label;
+        select.appendChild(o);
+    });
+
+    group.appendChild(lbl);
+    group.appendChild(select);
+    modalBody.appendChild(group);
+}
+
+/**
+ * @param {string|null} preferredKind ObjectKind to auto-select (e.g. FILE)
+ * @param {string[]|null} allowKinds ObjectKind allow-list; null = no filter
+ */
+async function addProfilingEntityTypeInput(preferredKind, allowKinds) {
+    addProfilingModalSelect('objectKind', 'Object Kind', [], true);
+    const select = document.getElementById('prof_modal_input_objectKind');
+
+    const applyKinds = (items) => {
+        const filtered = filterSupportedObjectsByKinds(items, allowKinds);
+        populateEntityTypeSelect(select, filtered);
+        if (preferredKind) {
+            selectProfilingObjectKind(preferredKind);
+        } else if (filtered.length === 1) {
+            selectProfilingObjectKind(filtered[0].typeName || filtered[0].type);
+        }
+        // File profiling: lock to FILE only (no other kinds selectable).
+        if (allowKinds && allowKinds.length === 1
+            && String(allowKinds[0]).toUpperCase() === 'FILE'
+            && select.value) {
+            select.disabled = true;
+            // Keep value submitted even when disabled.
+            select.name = 'objectKind';
+            let hidden = document.getElementById('prof_modal_input_objectKind_locked');
+            if (!hidden) {
+                hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.id = 'prof_modal_input_objectKind_locked';
+                hidden.name = 'objectKind';
+                select.parentNode.appendChild(hidden);
+            }
+            hidden.value = select.value;
+            select.removeAttribute('name');
+        }
+    };
+
+    if (supportedObjectsData && supportedObjectsData.supportedObjects) {
+        applyKinds(supportedObjectsData.supportedObjects);
+    } else {
+        select.options[0].textContent = '-- Loading types... --';
+        select.disabled = true;
+        try {
+            const config = getConnectionConfig();
+            const response = await fetch(`${API_BASE}/metadata/supported-objects`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+            if (response.ok) {
+                const data = await response.json();
+                supportedObjectsData = data;
+                updateProfilingFileButtonVisibility();
+                select.disabled = false;
+                select.options[0].textContent = '-- Select Object Kind --';
+                applyKinds(data.supportedObjects || []);
+            } else {
+                select.options[0].textContent = ' Error loading types ';
+            }
+        } catch (e) {
+            select.options[0].textContent = ' Error loading types ';
+            console.error('Error in background fetch', e);
+        }
+    }
+}
+
+function selectProfilingObjectKind(kind) {
+    const select = document.getElementById('prof_modal_input_objectKind');
+    if (!select || !kind) {
+        return;
+    }
+    const wanted = String(kind).toUpperCase();
+    for (let i = 0; i < select.options.length; i++) {
+        if (String(select.options[i].value).toUpperCase() === wanted) {
+            select.value = select.options[i].value;
+            return;
+        }
+    }
+}
+
+function addProfilingFieldPicker(multi) {
+    const modalBody = document.getElementById('profilingModalBody');
+    const group = document.createElement('div');
+    group.className = 'form-group';
+    group.id = 'prof_fields_picker_group';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = (multi ? 'Fields (multi-select, ≥1) *' : 'Field *');
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'input-with-action';
+
+    const select = document.createElement('select');
+    select.id = 'prof_modal_input_fields';
+    select.name = 'fields';
+    select.required = true;
+    select.multiple = !!multi;
+    if (multi) {
+        select.size = 8;
+        select.style.minHeight = '140px';
+        select.style.width = '100%';
+    }
+
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = multi ? '-- Fetch fields, then select ≥1 --' : '-- Fetch fields, then select one --';
+    defaultOpt.disabled = true;
+    defaultOpt.selected = true;
+    select.appendChild(defaultOpt);
+
+    const btn = document.createElement('button');
+    btn.className = 'icon-btn';
+    btn.innerHTML = '🔄';
+    btn.title = 'Fetch Fields';
+    btn.type = 'button';
+    btn.onclick = () => fetchFieldsForProfilingModal(select, btn, multi);
+
+    wrapper.appendChild(select);
+    wrapper.appendChild(btn);
+    group.appendChild(lbl);
+    group.appendChild(wrapper);
+    if (multi) {
+        const hint = document.createElement('div');
+        hint.className = 'help-text';
+        hint.textContent = 'Hold Ctrl/Cmd to select multiple fields.';
+        group.appendChild(hint);
+    }
+    modalBody.appendChild(group);
+
+    if (!multi) {
+        select.addEventListener('change', () => {
+            const opt = select.selectedOptions[0];
+            const dataTypeInput = document.getElementById('prof_modal_input_dataType');
+            const dataLengthInput = document.getElementById('prof_modal_input_dataLength');
+            if (opt && dataTypeInput) {
+                dataTypeInput.value = opt.getAttribute('data-datatype') || '';
+            }
+            if (opt && dataLengthInput) {
+                const len = opt.getAttribute('data-datalength');
+                dataLengthInput.value = len && len !== 'null' ? len : '';
+            }
+        });
+    }
+}
+
+async function fetchContainersForProfilingModal(input, btn) {
+    const originalIcon = btn.innerHTML;
+    btn.innerHTML = '<div class="loading" style="width:16px; height:16px; border-width:2px;"></div>';
+    btn.disabled = true;
+    document.getElementById('profilingModalSubmitBtn').disabled = true;
+
+    try {
+        const config = getConnectionConfig();
+        const response = await fetch(`${API_BASE}/metadata/containers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const containers = data.containers || [];
+
+            if (containers.length === 0) {
+                showError('No containers found');
+            } else if (containers.length === 1) {
+                input.value = containers[0].id || containers[0].name;
+            } else {
+                const select = document.createElement('select');
+                select.id = input.id;
+                select.name = input.name;
+                select.required = input.required;
+
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = '';
+                defaultOpt.textContent = '-- Select Container --';
+                select.appendChild(defaultOpt);
+
+                containers.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id || c.name;
+                    opt.textContent = c.name || c.id;
+                    select.appendChild(opt);
+                });
+
+                input.parentNode.replaceChild(select, input);
+                btn.remove();
+            }
+        } else {
+            showError('Failed to fetch containers');
+        }
+    } catch (e) {
+        console.error(e);
+        showError('Error connecting to API');
+    } finally {
+        document.getElementById('profilingModalSubmitBtn').disabled = false;
+        if (btn && btn.parentNode) {
+            btn.innerHTML = originalIcon;
+            btn.disabled = false;
+        }
+    }
+}
+
+async function fetchObjectsForProfilingModal(input, btn) {
+    const objectKindInput = document.getElementById('prof_modal_input_objectKind');
+    const containerIdInput = document.getElementById('prof_modal_input_containerId');
+
+    const entityType = objectKindInput ? objectKindInput.value : 'ENTITY';
+    const containerId = containerIdInput ? containerIdInput.value : '';
+
+    if (!containerId) {
+        showError('Please select Container ID first');
+        if (containerIdInput) containerIdInput.style.borderColor = 'red';
+        return;
+    }
+    if (containerIdInput) containerIdInput.style.borderColor = '';
+
+    const originalIcon = btn.innerHTML;
+    btn.innerHTML = '<div class="loading" style="width:16px; height:16px; border-width:2px;"></div>';
+    btn.disabled = true;
+    document.getElementById('profilingModalSubmitBtn').disabled = true;
+
+    try {
+        const config = getConnectionConfig();
+        let displayNameParam = '';
+        if (objectKindInput && objectKindInput.selectedOptions && objectKindInput.selectedOptions.length) {
+            const selectedOpt = objectKindInput.selectedOptions[0];
+            const dn = selectedOpt.getAttribute('data-displayname') || selectedOpt.textContent;
+            if (dn && dn.trim()) displayNameParam = `&displayName=${encodeURIComponent(dn.trim())}`;
+        }
+        const url = `${API_BASE}/metadata/objects?entityType=${encodeURIComponent(entityType)}&containerId=${encodeURIComponent(containerId)}${displayNameParam}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const objects = data.objects || data.children || [];
+
+            if (objects.length === 0) {
+                showError('No objects found');
+            } else if (objects.length === 1) {
+                const obj = objects[0];
+                input.value = obj.id || obj.name || obj.displayName || obj.typeName || '';
+            } else {
+                const select = document.createElement('select');
+                select.id = input.id;
+                select.name = input.name;
+                select.required = input.required;
+
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = '';
+                defaultOpt.textContent = '-- Select Object --';
+                select.appendChild(defaultOpt);
+
+                objects.forEach(obj => {
+                    const opt = document.createElement('option');
+                    opt.value = obj.id || obj.name || obj.displayName || obj.typeName || '';
+                    opt.textContent = obj.name || obj.displayName || obj.id || obj.typeName || '';
+                    select.appendChild(opt);
+                });
+
+                input.parentNode.replaceChild(select, input);
+                btn.remove();
+            }
+        } else {
+            showError('Failed to fetch objects');
+        }
+    } catch (e) {
+        console.error(e);
+        showError('Error connecting to API');
+    } finally {
+        document.getElementById('profilingModalSubmitBtn').disabled = false;
+        if (btn && btn.parentNode) {
+            btn.innerHTML = originalIcon;
+            btn.disabled = false;
+        }
+    }
+}
+
+async function fetchFieldsForProfilingModal(select, btn, multi) {
+    const objectKindInput = document.getElementById('prof_modal_input_objectKind');
+    const containerIdInput = document.getElementById('prof_modal_input_containerId');
+    const entityIdInput = document.getElementById('prof_modal_input_entityId');
+
+    const entityType = objectKindInput ? objectKindInput.value : 'ENTITY';
+    const containerId = containerIdInput ? containerIdInput.value : '';
+    const entityId = entityIdInput ? entityIdInput.value : '';
+
+    if (!containerId || !entityId) {
+        showError('Please select Container ID and Entity ID first');
+        if (!containerId && containerIdInput) containerIdInput.style.borderColor = 'red';
+        if (!entityId && entityIdInput) entityIdInput.style.borderColor = 'red';
+        return;
+    }
+    if (containerIdInput) containerIdInput.style.borderColor = '';
+    if (entityIdInput) entityIdInput.style.borderColor = '';
+
+    const originalIcon = btn.innerHTML;
+    btn.innerHTML = '<div class="loading" style="width:16px; height:16px; border-width:2px;"></div>';
+    btn.disabled = true;
+    document.getElementById('profilingModalSubmitBtn').disabled = true;
+
+    try {
+        const config = getConnectionConfig();
+        let displayNameParam = '';
+        if (objectKindInput && objectKindInput.selectedOptions && objectKindInput.selectedOptions.length) {
+            const selectedOpt = objectKindInput.selectedOptions[0];
+            const dn = selectedOpt.getAttribute('data-displayname') || selectedOpt.textContent;
+            if (dn && dn.trim()) {
+                displayNameParam = `&displayName=${encodeURIComponent(dn.trim())}`;
+            }
+        }
+
+        const url = `${API_BASE}/metadata/fields?entityType=${encodeURIComponent(entityType)}&containerId=${encodeURIComponent(containerId)}&entityId=${encodeURIComponent(entityId)}${displayNameParam}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const fields = data.fields || data.children || [];
+
+            if (fields.length === 0) {
+                showError('No fields found');
+            } else {
+                while (select.options.length) select.remove(0);
+                if (!multi) {
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = '';
+                    defaultOpt.textContent = '-- Select Field --';
+                    select.appendChild(defaultOpt);
+                }
+                fields.forEach(f => {
+                    const name = f.fieldName || f.name || f.id || f.displayName;
+                    if (!name) return;
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    const dt = f.dataType || '';
+                    opt.textContent = dt ? `${name} (${dt})` : name;
+                    opt.setAttribute('data-datatype', dt);
+                    let dataLength = null;
+                    if (f.dataLength != null) dataLength = f.dataLength;
+                    else if (f.length != null) dataLength = f.length;
+                    else if (f.properties && f.properties.dataLength != null) dataLength = f.properties.dataLength;
+                    if (dataLength != null) opt.setAttribute('data-datalength', String(dataLength));
+                    select.appendChild(opt);
+                });
+            }
+        } else {
+            showError('Failed to fetch fields');
+        }
+    } catch (e) {
+        console.error(e);
+        showError('Error connecting to API');
+    } finally {
+        document.getElementById('profilingModalSubmitBtn').disabled = false;
+        if (btn && btn.parentNode) {
+            btn.innerHTML = originalIcon;
+            btn.disabled = false;
+        }
+    }
+}
+
+function collectProfilingSelectedFields() {
+    const select = document.getElementById('prof_modal_input_fields');
+    if (!select) return [];
+    const specs = [];
+    Array.from(select.selectedOptions).forEach(opt => {
+        if (!opt.value) return;
+        const lenAttr = opt.getAttribute('data-datalength');
+        let dataLength = null;
+        if (lenAttr != null && lenAttr !== '' && lenAttr !== 'null') {
+            const parsed = parseInt(lenAttr, 10);
+            if (!isNaN(parsed)) dataLength = parsed;
+        }
+        specs.push({
+            fieldName: opt.value,
+            dataType: opt.getAttribute('data-datatype') || null,
+            dataLength: dataLength
+        });
+    });
+    return specs;
+}
+
+async function submitProfilingModal() {
+    const inputs = document.querySelectorAll('#profilingModalBody input, #profilingModalBody select');
+    const params = {};
+    let isValid = true;
+
+    inputs.forEach(input => {
+        if (input.id === 'prof_modal_input_fields') return;
+        if (input.required && !input.value) {
+            input.style.borderColor = 'red';
+            isValid = false;
+        } else {
+            input.style.borderColor = '';
+            params[input.name] = input.value;
+        }
+    });
+
+    const fieldsSelect = document.getElementById('prof_modal_input_fields');
+    const fieldsGroup = document.getElementById('prof_fields_picker_group');
+    const fieldsVisible = fieldsGroup && fieldsGroup.style.display !== 'none';
+    let selectedFields = [];
+    if (fieldsSelect && fieldsVisible) {
+        selectedFields = collectProfilingSelectedFields();
+        if (fieldsSelect.required && selectedFields.length < 1) {
+            fieldsSelect.style.borderColor = 'red';
+            isValid = false;
+            showError(fieldsSelect.multiple
+                ? 'Select at least one field'
+                : 'Select a field');
+        } else {
+            fieldsSelect.style.borderColor = '';
+        }
+    }
+
+    if (!isValid) return;
+
+    closeProfilingModal();
+
+    let action = {};
+    if (currentProfilingActionType === 'rowCount') {
+        action = {
+            name: 'Profile Row Count',
+            endpoint: '/profiling/row-count',
+            method: 'POST',
+            isProfiling: true,
+            profilingKind: 'rowCount',
+            profilingParams: params
+        };
+    } else if (currentProfilingActionType === 'column') {
+        const field = selectedFields[0] || {};
+        action = {
+            name: 'Profile Column',
+            endpoint: '/profiling/column',
+            method: 'POST',
+            isProfiling: true,
+            profilingKind: 'column',
+            profilingParams: {
+                ...params,
+                fieldName: field.fieldName || params.fields,
+                dataType: params.dataType || field.dataType || null,
+                dataLength: params.dataLength ? parseInt(params.dataLength, 10) : (field.dataLength != null ? field.dataLength : null)
+            }
+        };
+    } else if (currentProfilingActionType === 'sample') {
+        action = {
+            name: 'Sample Profile',
+            endpoint: '/profiling/sample',
+            method: 'POST',
+            isProfiling: true,
+            profilingKind: 'sample',
+            profilingParams: {
+                ...params,
+                fields: selectedFields
+            }
+        };
+    } else if (currentProfilingActionType === 'batch') {
+        action = {
+            name: 'Profile Batch',
+            endpoint: '/profiling/batch',
+            method: 'POST',
+            isProfiling: true,
+            profilingKind: 'batch',
+            profilingParams: {
+                ...params,
+                fields: selectedFields
+            }
+        };
+    } else if (currentProfilingActionType === 'file') {
+        action = {
+            name: 'Profile File',
+            endpoint: '/profiling/file',
+            method: 'POST',
+            isProfiling: true,
+            profilingKind: 'file',
+            profilingParams: {
+                ...params,
+                objectKind: params.objectKind || 'FILE',
+                hasHeaders: params.hasHeaders === 'true',
+                dataLakeFolder: params.dataLakeFolder === 'true'
+            }
+        };
+    }
+
+    executeAction(action);
+}
+
 async function executeAction(action) {
     const resultContent = document.getElementById('resultContent');
 
@@ -3055,6 +4146,63 @@ async function executeAction(action) {
                 connectionConfig: config
             };
             body = JSON.stringify(edgiRequest);
+        } else if (action.isProfiling) {
+            const p = action.profilingParams || {};
+            let profilingRequest = { connectionConfig: config };
+            if (action.profilingKind === 'rowCount') {
+                profilingRequest = {
+                    connectionConfig: config,
+                    objectKind: p.objectKind,
+                    containerId: p.containerId,
+                    entityId: p.entityId
+                };
+            } else if (action.profilingKind === 'column') {
+                profilingRequest = {
+                    connectionConfig: config,
+                    objectKind: p.objectKind,
+                    containerId: p.containerId,
+                    entityId: p.entityId,
+                    fieldName: p.fieldName,
+                    dataType: p.dataType || null,
+                    dataLength: p.dataLength != null && p.dataLength !== '' && !isNaN(p.dataLength)
+                        ? Number(p.dataLength) : null
+                };
+            } else if (action.profilingKind === 'sample') {
+                profilingRequest = {
+                    connectionConfig: config,
+                    objectKind: p.objectKind,
+                    containerId: p.containerId,
+                    entityId: p.entityId,
+                    fields: p.fields || []
+                };
+            } else if (action.profilingKind === 'batch') {
+                const mode = p.batchMode || 'COLUMN';
+                const target = { entityId: p.entityId };
+                if (mode === 'COLUMN' || mode === 'BOTH' || mode === 'SAMPLE') {
+                    target.fields = p.fields || [];
+                }
+                profilingRequest = {
+                    connectionConfig: config,
+                    objectKind: p.objectKind,
+                    containerId: p.containerId,
+                    batchMode: mode,
+                    targets: [target]
+                };
+            } else if (action.profilingKind === 'file') {
+                profilingRequest = {
+                    connectionConfig: config,
+                    objectKind: p.objectKind || 'FILE',
+                    containerId: p.containerId,
+                    entityId: p.entityId,
+                    location: p.location,
+                    extRefId: p.extRefId || null,
+                    sheetName: p.sheetName || null,
+                    alternateExtType: p.alternateExtType || null,
+                    hasHeaders: p.hasHeaders === true || p.hasHeaders === 'true',
+                    dataLakeFolder: p.dataLakeFolder === true || p.dataLakeFolder === 'true'
+                };
+            }
+            body = JSON.stringify(profilingRequest);
         }
 
         const response = await fetch(url, {

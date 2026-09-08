@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.imageio.ImageIO;
@@ -43,6 +45,8 @@ public class ConnectorGeneratorService {
     private static final int ICON_SIZE_128 = 128;
     private static final String MODULE_MARKER_NEW =
             "<!-- Connector generator marker (modules): DO NOT REMOVE. New connector modules are inserted above this line. -->";
+    private static final String MODULE_MARKER_APPS =
+            "<!-- Add new Connector modules here -->";
     private static final String DEP_MARKER_NEW =
             "<!-- Connector generator marker (dependencies): DO NOT REMOVE. New connector dependencies are inserted above this line. -->";
     private static final String TEST_REPORT_MODULES_OPEN = "<csp.sdk.test.report.modules>";
@@ -73,7 +77,16 @@ public class ConnectorGeneratorService {
             Files.createDirectories(moduleRoot);
 
             Map<String, String> templateValues = TemplateValues.from(context);
+            applyRepoParentVersion(templateValues, request != null ? request.getRepoRoot() : null);
             templateValues.put("iconExtension", iconExtension);
+            boolean profilingEnabled = isProfilingEnabled(request);
+            String profilingMode = resolveProfilingMode(request, profilingEnabled);
+            TemplateValues.applyProfiling(
+                    templateValues,
+                    context.getClassPrefix(),
+                    profilingEnabled,
+                    profilingMode,
+                    context.getObjectKinds());
 
             // Use connector-archetype templates as the single source of truth
             writeTemplate(moduleRoot.resolve("pom.xml"), "archetype-resources/pom.xml", templateValues);
@@ -89,6 +102,11 @@ public class ConnectorGeneratorService {
             writeTemplate(javaBase.resolve("main/" + context.getClassPrefix() + "QueryService.java"),
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__packageName__/main/__classPrefix__QueryService.java",
                     templateValues);
+            if (profilingEnabled) {
+                writeTemplate(javaBase.resolve("main/" + context.getClassPrefix() + "ProfilingService.java"),
+                        "archetype-resources/src/main/java/com/ovaledge/csp/apps/__packageName__/main/__classPrefix__ProfilingService.java",
+                        templateValues);
+            }
             writeTemplate(javaBase.resolve("constants/" + context.getClassPrefix() + "Constants.java"),
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__packageName__/constants/__classPrefix__Constants.java",
                     templateValues);
@@ -99,7 +117,7 @@ public class ConnectorGeneratorService {
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__packageName__/quick/__classPrefix__QuickApplication.java",
                     templateValues);
 
-            writeGeneratedUnitTests(moduleRoot, context, templateValues);
+            writeGeneratedUnitTests(moduleRoot, context, templateValues, profilingEnabled);
 
             Path resourcesBase = moduleRoot.resolve("src/main/resources");
             Path servicesPath = resourcesBase.resolve("META-INF/services");
@@ -212,7 +230,16 @@ public class ConnectorGeneratorService {
             Files.createDirectories(moduleRoot);
 
             Map<String, String> templateValues = TemplateValues.from(context);
+            applyRepoParentVersion(templateValues, repoRootPath);
             templateValues.put("iconExtension", iconExtension);
+            boolean profilingEnabled = isProfilingEnabled(request);
+            String profilingMode = resolveProfilingMode(request, profilingEnabled);
+            TemplateValues.applyProfiling(
+                    templateValues,
+                    context.getClassPrefix(),
+                    profilingEnabled,
+                    profilingMode,
+                    context.getObjectKinds());
 
             // Use connector-archetype templates as the single source of truth
             writeTemplate(moduleRoot.resolve("pom.xml"), "archetype-resources/pom.xml", templateValues);
@@ -227,6 +254,11 @@ public class ConnectorGeneratorService {
             writeTemplate(javaBase.resolve("main/" + context.getClassPrefix() + "QueryService.java"),
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__packageName__/main/__classPrefix__QueryService.java",
                     templateValues);
+            if (profilingEnabled) {
+                writeTemplate(javaBase.resolve("main/" + context.getClassPrefix() + "ProfilingService.java"),
+                        "archetype-resources/src/main/java/com/ovaledge/csp/apps/__packageName__/main/__classPrefix__ProfilingService.java",
+                        templateValues);
+            }
             writeTemplate(javaBase.resolve("constants/" + context.getClassPrefix() + "Constants.java"),
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__packageName__/constants/__classPrefix__Constants.java",
                     templateValues);
@@ -237,7 +269,7 @@ public class ConnectorGeneratorService {
                     "archetype-resources/src/main/java/com/ovaledge/csp/apps/__packageName__/quick/__classPrefix__QuickApplication.java",
                     templateValues);
 
-            writeGeneratedUnitTests(moduleRoot, context, templateValues);
+            writeGeneratedUnitTests(moduleRoot, context, templateValues, profilingEnabled);
 
             Path resourcesBase = moduleRoot.resolve("src/main/resources");
             Path servicesPath = resourcesBase.resolve("META-INF/services");
@@ -360,7 +392,7 @@ public class ConnectorGeneratorService {
     }
 
     private PomUpsertResult upsertParentModuleInMemory(String pom, String artifactId) throws IOException {
-        String marker = firstMarkerPresent(pom, MODULE_MARKER_NEW);
+        String marker = firstMarkerPresent(pom, MODULE_MARKER_NEW, MODULE_MARKER_APPS);
         String moduleLine = "    <module>" + artifactId + "</module>";
         if (pom.contains("<module>" + artifactId + "</module>")) {
             return new PomUpsertResult(pom, false);
@@ -421,12 +453,13 @@ public class ConnectorGeneratorService {
         if (marker != null) {
             updated = pom.replace(marker, depSnippet + "\n" + marker);
         } else {
-            updated = insertBeforeClosingTagInSection(
+            updated = insertBeforeClosingTagInNestedSection(
                     pom,
                     "<dependencyManagement>",
-                    "</dependencyManagement>",
+                    "<dependencies>",
+                    "</dependencies>",
                     depSnippet + "\n",
-                    "parent pom.xml dependencyManagement section");
+                    "parent pom.xml dependencyManagement dependencies");
         }
         return new PomUpsertResult(updated, true);
     }
@@ -457,6 +490,7 @@ public class ConnectorGeneratorService {
 
     /**
      * No-op when {@code csp.sdk.test.report.modules} is absent.
+     * No-op when the property is absent (e.g. SDK reactor).
      */
     private PomUpsertResult upsertTestReportModulesInMemory(String pom, String artifactId) throws IOException {
         int propertyStart = pom.indexOf(TEST_REPORT_MODULES_OPEN);
@@ -571,10 +605,32 @@ public class ConnectorGeneratorService {
         return last;
     }
 
+    private String insertBeforeClosingTagInNestedSection(
+            String xml,
+            String outerOpenTag,
+            String innerOpenTag,
+            String innerCloseTag,
+            String snippetWithTrailingNewline,
+            String sectionLabel) throws IOException {
+        int outerStart = xml.indexOf(outerOpenTag);
+        if (outerStart < 0) {
+            throw new IOException("Unable to locate " + sectionLabel + " (missing " + outerOpenTag + ").");
+        }
+        int innerStart = xml.indexOf(innerOpenTag, outerStart);
+        if (innerStart < 0) {
+            throw new IOException("Unable to locate " + sectionLabel + " (missing " + innerOpenTag + ").");
+        }
+        int innerEnd = xml.indexOf(innerCloseTag, innerStart);
+        if (innerEnd < 0) {
+            throw new IOException("Unable to locate " + sectionLabel + " (missing " + innerCloseTag + ").");
+        }
+        return xml.substring(0, innerEnd) + snippetWithTrailingNewline + xml.substring(innerEnd);
+    }
+
     /**
      * Validates generator input and derives artifact id, package name, and class prefix.
      *
-     * <p>Rejects connector names on the legacy txt list or already used by an in-repo SDK module.
+     * <p>Rejects connector names on the legacy txt list or already used by an in-repo Apps module.
      */
     private ConnectorGenerationContext validateAndNormalize(ConnectorGeneratorRequest request, Path repoRootPath) {
         List<String> errors = new ArrayList<>();
@@ -799,7 +855,7 @@ public class ConnectorGeneratorService {
     }
 
     /**
-     * Resolves the SDK repository root used by {@link LegacyPlatformServerTypes} and
+     * Resolves the Apps repository root used by {@link LegacyPlatformServerTypes} and
      * {@link SdkConnectorReactorScanner} when validating connector names.
      *
      * <p>When {@code repoRoot} is blank, uses {@code user.dir} if it contains a {@code pom.xml}, otherwise
@@ -807,7 +863,7 @@ public class ConnectorGeneratorService {
      * against {@code user.dir}. Invalid paths fall back to {@code user.dir}.
      *
      * @param repoRoot optional path from the generator form or {@code GET /v1/generator/reserved-server-types}
-     * @return absolute normalized path to the multi-module SDK root
+     * @return absolute normalized path to the multi-module Apps root
      */
     public static Path resolveRepoRootPath(String repoRoot) {
         if (repoRoot == null || repoRoot.trim().isEmpty()) {
@@ -828,6 +884,9 @@ public class ConnectorGeneratorService {
         }
     }
 
+    /**
+     * Walks up from {@code user.dir} to locate the multi-module reactor root ({@code csp-api} + {@code assembly}).
+     */
     private static Path inferReactorRootFromWorkingDirectory() {
         Path inferred = inferReactorRootFrom(
                 Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize());
@@ -901,8 +960,8 @@ public class ConnectorGeneratorService {
         connectorMaster.put("queryLogsCrawling", false);
         connectorMaster.put("profiling", boolOrDefault(cm.getProfiling(), false));
         connectorMaster.put("deltaProfiling", false);
-        connectorMaster.put("sampleProfiling", false);
         connectorMaster.put("conditionalProfiling", false);
+        // sampleProfiling set after crawlerOptions are normalized
         connectorMaster.put("querySheet", boolOrDefault(cm.getQuerySheet(), true));
         connectorMaster.put("queryPolicies", false);
         connectorMaster.put("querySheetAppPermissions", false);
@@ -928,10 +987,25 @@ public class ConnectorGeneratorService {
                 cm.getCredentialManagers() != null && !cm.getCredentialManagers().isEmpty()
                         ? cm.getCredentialManagers() : List.of("DATABASE"));
         connectorMaster.put("usageCostModel", cm.getUsageCostModel());
-        root.put("connectorMaster", connectorMaster);
 
         List<Map<String, String>> crawlerOptions =
                 buildCrawlerOptions(context.getObjectKinds(), manifest.getCrawlerOptions());
+        boolean profiling = boolOrDefault(cm.getProfiling(), false);
+        if (profiling) {
+            forceCrawlerOption(crawlerOptions, "CRAWLER_PREFERENCE", "P");
+        } else {
+            crawlerOptions.removeIf(o -> {
+                String type = o.get("optionType");
+                String key = o.get("optionKey");
+                return "PROFILE_OPTIONS".equals(type)
+                        || "PROFILE_TYPES".equals(type)
+                        || ("CRAWLER_PREFERENCE".equals(type) && "P".equals(key));
+            });
+        }
+        connectorMaster.put("sampleProfiling",
+                profiling && hasCrawlerOption(crawlerOptions, "PROFILE_TYPES", "S"));
+        root.put("connectorMaster", connectorMaster);
+
         Map<String, Object> crawlerSettings = buildCrawlerSettings(
                 context.getConnectorName(),
                 context.getArtifactId(),
@@ -994,6 +1068,16 @@ public class ConnectorGeneratorService {
         item.put("optionType", type);
         item.put("optionKey", key);
         options.add(item);
+    }
+
+    private void forceCrawlerOption(List<Map<String, String>> options, String type, String key) {
+        Set<String> dedupe = new LinkedHashSet<>();
+        for (Map<String, String> o : options) {
+            if (o != null && o.get("optionType") != null && o.get("optionKey") != null) {
+                dedupe.add(o.get("optionType") + ":" + o.get("optionKey"));
+            }
+        }
+        addCrawlerOption(options, dedupe, type, key);
     }
 
     private Map<String, Object> buildCrawlerSettings(
@@ -1172,7 +1256,8 @@ public class ConnectorGeneratorService {
     }
 
     private void writeGeneratedUnitTests(
-            Path moduleRoot, ConnectorGenerationContext context, Map<String, String> templateValues)
+            Path moduleRoot, ConnectorGenerationContext context, Map<String, String> templateValues,
+            boolean profilingEnabled)
             throws IOException {
         Path unitTestBase =
                 moduleRoot.resolve("src/test/java/com/ovaledge/csp/tests/unit/connector/" + context.getPackageName());
@@ -1188,6 +1273,12 @@ public class ConnectorGeneratorService {
                 unitTestBase.resolve(context.getClassPrefix() + "QueryServiceUnitTest.java"),
                 "archetype-resources/src/test/java/com/ovaledge/csp/tests/unit/connector/__packageName__/__classPrefix__QueryServiceUnitTest.java",
                 templateValues);
+        if (profilingEnabled) {
+            writeTemplateIfAbsentWithInfo(
+                    unitTestBase.resolve(context.getClassPrefix() + "ProfilingServiceUnitTest.java"),
+                    "archetype-resources/src/test/java/com/ovaledge/csp/tests/unit/connector/__packageName__/__classPrefix__ProfilingServiceUnitTest.java",
+                    templateValues);
+        }
 
         Path testRoot = moduleRoot.resolve("src/test/java/com/ovaledge/csp/tests");
         writeTemplateIfAbsentWithInfo(
@@ -1202,6 +1293,83 @@ public class ConnectorGeneratorService {
                 testRoot.resolve("deprecated/package-info.java"),
                 "archetype-resources/src/test/java/com/ovaledge/csp/tests/deprecated/package-info.java",
                 templateValues);
+    }
+
+    /**
+     * Stamp generated module parent version from the repo POM, not stale
+     * release properties ({@code TemplateValues} fallback).
+     */
+    private void applyRepoParentVersion(Map<String, String> templateValues, Path repoRoot) {
+        if (templateValues == null || repoRoot == null) {
+            return;
+        }
+        String version = readRepoProjectVersion(repoRoot);
+        if (version != null && !version.isBlank()) {
+            templateValues.put("sdkVersion", version);
+        }
+    }
+
+    private void applyRepoParentVersion(Map<String, String> templateValues, String repoRoot) {
+        if (repoRoot == null || repoRoot.isBlank()) {
+            return;
+        }
+        try {
+            applyRepoParentVersion(templateValues, Paths.get(repoRoot));
+        } catch (InvalidPathException e) {
+            log.debug("Could not resolve repo root for parent version: {}", e.getMessage());
+        }
+    }
+
+    private String readRepoProjectVersion(Path repoRoot) {
+        Path pom = repoRoot.resolve("pom.xml");
+        if (!Files.isRegularFile(pom)) {
+            return null;
+        }
+        try {
+            String text = Files.readString(pom, StandardCharsets.UTF_8);
+            int parentEnd = text.indexOf("</parent>");
+            String search = parentEnd >= 0 ? text.substring(parentEnd) : text;
+            Matcher matcher = Pattern.compile("<version>\\s*([^<]+?)\\s*</version>").matcher(search);
+            if (matcher.find()) {
+                return matcher.group(1).trim();
+            }
+        } catch (IOException e) {
+            log.debug("Could not read repo parent version from {}: {}", pom, e.getMessage());
+        }
+        return null;
+    }
+
+    private boolean isProfilingEnabled(ConnectorGeneratorRequest request) {
+        return request != null
+                && request.getManifest() != null
+                && request.getManifest().getConnectorMaster() != null
+                && boolOrDefault(request.getManifest().getConnectorMaster().getProfiling(), false);
+    }
+
+    private String resolveProfilingMode(ConnectorGeneratorRequest request, boolean profilingEnabled) {
+        if (!profilingEnabled) {
+            return "SAMPLE";
+        }
+        String mode = request != null && request.getProfilingMode() != null
+                ? request.getProfilingMode().trim().toUpperCase()
+                : "SAMPLE";
+        String protocol = null;
+        if (request != null
+                && request.getManifest() != null
+                && request.getManifest().getConnectorMaster() != null) {
+            protocol = request.getManifest().getConnectorMaster().getProtocol();
+        }
+        boolean jdbc = protocol != null && "JDBC".equalsIgnoreCase(protocol.trim());
+        boolean hasFileKind = request != null
+                && request.getObjectKinds() != null
+                && request.getObjectKinds().stream()
+                .filter(k -> k != null)
+                .map(k -> k.trim().toUpperCase())
+                .anyMatch(k -> "FILE".equals(k) || "FILEFOLDERS".equals(k));
+        if ("DBMS".equals(mode) && (jdbc || hasFileKind)) {
+            return "DBMS";
+        }
+        return "SAMPLE";
     }
 
     private void writeTemplate(Path path, String templateName, Map<String, String> values) throws IOException {

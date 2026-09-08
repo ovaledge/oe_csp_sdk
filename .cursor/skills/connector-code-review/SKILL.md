@@ -44,7 +44,8 @@ Check that the connector module has the correct layout:
 │   ├── main/
 │   │   ├── {Prefix}Connector.java
 │   │   ├── {Prefix}MetadataService.java
-│   │   └── {Prefix}QueryService.java
+│   │   ├── {Prefix}QueryService.java
+│   │   └── {Prefix}ProfilingService.java   (optional: Profiling enabled in UI generator)
 │   ├── constants/
 │   │   └── {Prefix}Constants.java
 │   ├── client/                           (optional: REST/OAuth2 only)
@@ -60,7 +61,8 @@ Check that the connector module has the correct layout:
 └── src/test/java/com/ovaledge/csp/tests/unit/connector/{package}/
     ├── {Prefix}ConnectorUnitTest.java
     ├── {Prefix}MetadataServiceUnitTest.java
-    └── {Prefix}QueryServiceUnitTest.java
+    ├── {Prefix}QueryServiceUnitTest.java
+    └── {Prefix}ProfilingServiceUnitTest.java   (optional: when ProfilingService exists)
 ```
 
 **1.2 SPI Registration**
@@ -98,6 +100,7 @@ Review `{Prefix}Connector.java`:
 | `getServerType()` | Returns stable, non-empty, lowercase string; matches Constants.SERVER_TYPE |
 | `getMetadataService()` | Returns non-null, reusable instance |
 | `getQueryService()` | Returns non-null, reusable instance |
+| `getProfilingService()` | Optional. Non-null only when JSON declares profiling; then returns a reusable `ProfilingService`. Default `null` when profiling is off |
 | `validateConnection(ConnectionConfig)` | Validates required fields; returns structured response; handles null config |
 | `getAttributes()` | Includes credential manager attributes, generic attributes, connector-specific, governance, security roles |
 | `exchangeAttributes(ConnInfo)` | Maps ConnInfo → attribute map; preserves values |
@@ -229,6 +232,7 @@ Review `{Prefix}Controller.java`:
 - [ ] `{Prefix}ConnectorUnitTest.java` exists with tests for all public methods
 - [ ] `{Prefix}MetadataServiceUnitTest.java` exists with metadata tests
 - [ ] `{Prefix}QueryServiceUnitTest.java` exists with query tests
+- [ ] If `{Prefix}ProfilingService` exists: `{Prefix}ProfilingServiceUnitTest.java` covers supported ops and unsupported kinds
 - [ ] Tests cover happy path, error scenarios, and edge cases
 - [ ] Tests pass: `mvn -pl {connector-id} -Punit-tests test`
 

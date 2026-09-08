@@ -4,10 +4,17 @@ import com.ovaledge.csp.v3.core.apps.model.request.ContainersRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.EdgiConnectorObjectRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.FieldsRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.ObjectRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.ProfileBatchRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.ProfileColumnRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.FileProfileRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.ProfileRowCountRequest;
 import com.ovaledge.csp.v3.core.apps.model.request.QueryRequest;
+import com.ovaledge.csp.v3.core.apps.model.request.SampleProfileRequest;
 import com.ovaledge.csp.v3.core.apps.model.response.*;
 import com.ovaledge.csp.v3.core.model.ConnectionConfig;
 import com.ovaledge.csp.v3.core.apps.model.response.ValidateConnectionResponse;
+
+import java.util.Map;
 
 /**
  * Service interface for Apps connector operations.
@@ -22,6 +29,7 @@ import com.ovaledge.csp.v3.core.apps.model.response.ValidateConnectionResponse;
  *   <li><b>Connection Management:</b> Validation and configuration handling</li>
  *   <li><b>Metadata Services:</b> Supported objects, containers, objects, and fields metadata extraction</li>
  *   <li><b>Query Execution:</b> Data fetching from connectors</li>
+ *   <li><b>Profiling:</b> Row count, column, sample, file, and batch via {@code ProfilingService}</li>
  * </ul>
  * </p>
  * <p>
@@ -123,6 +131,68 @@ public interface AppsService {
      *         due to syntax, permission, or connection issues. The exception message includes available connector types.
      */
     QueryResponse executeQuery(QueryRequest request);
+
+    /**
+     * Returns row count via the connector's {@link com.ovaledge.csp.v3.core.apps.service.ProfilingService}.
+     *
+     * @param request identity ({@code objectKind}, container, entity) and connection
+     * @return row count
+     * @throws com.ovaledge.csp.v3.core.apps.exceptions.ProfilingUnsupportedException
+     *         if the connector has no profiling service, or the operation/kind is unsupported
+     * @throws com.ovaledge.csp.v3.core.apps.exceptions.ProfilingException on hard profiling failures
+     * @throws RuntimeException if no connector is found for {@code serverType}
+     */
+    long getRowCount(ProfileRowCountRequest request);
+
+    /**
+     * Profiles a single column via {@link com.ovaledge.csp.v3.core.apps.service.ProfilingService}.
+     *
+     * @param request column identity plus {@code dataType}/{@code dataLength} for skip rules
+     * @return per-column stats
+     * @throws com.ovaledge.csp.v3.core.apps.exceptions.ProfilingUnsupportedException
+     *         if the connector has no profiling service, or the operation/kind is unsupported
+     * @throws com.ovaledge.csp.v3.core.apps.exceptions.ProfilingException on hard profiling failures
+     * @throws RuntimeException if no connector is found for {@code serverType}
+     */
+    ProfileColumnResult profileColumn(ProfileColumnRequest request);
+
+    /**
+     * Sample-profiles an object via {@link com.ovaledge.csp.v3.core.apps.service.ProfilingService}.
+     *
+     * @param request object identity plus optional fields and sample size
+     * @return field name → stats
+     * @throws com.ovaledge.csp.v3.core.apps.exceptions.ProfilingUnsupportedException
+     *         if the connector has no profiling service, or the operation/kind is unsupported
+     * @throws com.ovaledge.csp.v3.core.apps.exceptions.ProfilingException on hard profiling failures
+     * @throws RuntimeException if no connector is found for {@code serverType}
+     */
+    Map<String, ProfileColumnResult> sampleProfile(SampleProfileRequest request);
+
+    /**
+     * Batch-profiles targets via {@link com.ovaledge.csp.v3.core.apps.service.ProfilingService}.
+     * {@code batchMode} selects row-count, column, sample, or both.
+     *
+     * @param request shared identity plus {@code targets} and {@code batchMode}
+     * @return per-entity row counts and/or column results, plus failure maps
+     * @throws com.ovaledge.csp.v3.core.apps.exceptions.ProfilingUnsupportedException
+     *         if the connector has no profiling service, or the operation/kind is unsupported
+     * @throws com.ovaledge.csp.v3.core.apps.exceptions.ProfilingException on hard profiling failures
+     * @throws RuntimeException if no connector is found for {@code serverType}
+     */
+    ProfileBatchResponse profileBatch(ProfileBatchRequest request);
+
+    /**
+     * File profiling via {@link com.ovaledge.csp.v3.core.apps.service.ProfilingService}.
+     * Default connector implementations throw unsupported; live file parse is connector-owned.
+     *
+     * @param request file identity ({@code objectKind=FILE}, location, optional sheet/headers)
+     * @return file profile response (column stats by sheet when implemented)
+     * @throws com.ovaledge.csp.v3.core.apps.exceptions.ProfilingUnsupportedException
+     *         if the connector has no profiling service, or file profiling is unsupported
+     * @throws com.ovaledge.csp.v3.core.apps.exceptions.ProfilingException on hard profiling failures
+     * @throws RuntimeException if no connector is found for {@code serverType}
+     */
+    FileProfileResponse profileFile(FileProfileRequest request);
 
     /**
      * Executes EDGI object processing for a connector.
